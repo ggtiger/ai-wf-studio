@@ -40,6 +40,8 @@ export const zhTWWebviewTranslations: WebviewTranslationKeys = {
   'toolbar.error.validationFailed': '工作流驗證失敗',
   'toolbar.error.missingEndNode': '工作流必須至少包含一個End節點',
   'toolbar.error.noActiveWorkflow': '請先載入工作流',
+  'toolbar.generateNameWithAI': '使用AI生成名稱',
+  'toolbar.error.nameGenerationFailed': '生成工作流名稱失敗。請重試或手動輸入。',
 
   // Node Palette
   'palette.title': '節點面板',
@@ -578,7 +580,6 @@ export const zhTWWebviewTranslations: WebviewTranslationKeys = {
 
   // Slack Description AI Generation
   'slack.description.generateWithAI': 'AI產生',
-  'slack.description.generating': '產生中...',
   'slack.description.generateFailed': '產生描述失敗。請重試或手動輸入。',
 
   // Slack Connect

@@ -40,6 +40,9 @@ export const enWebviewTranslations: WebviewTranslationKeys = {
   'toolbar.error.validationFailed': 'Workflow validation failed',
   'toolbar.error.missingEndNode': 'Workflow must have at least one End node',
   'toolbar.error.noActiveWorkflow': 'Please load a workflow first',
+  'toolbar.generateNameWithAI': 'Generate name with AI',
+  'toolbar.error.nameGenerationFailed':
+    'Failed to generate workflow name. Please try again or enter manually.',
 
   // Node Palette
   'palette.title': 'Node Palette',
@@ -606,7 +609,6 @@ export const enWebviewTranslations: WebviewTranslationKeys = {
 
   // Slack Description AI Generation
   'slack.description.generateWithAI': 'Generate with AI',
-  'slack.description.generating': 'Generating...',
   'slack.description.generateFailed':
     'Failed to generate description. Please try again or write manually.',
 

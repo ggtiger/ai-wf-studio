@@ -38,6 +38,8 @@ export interface WebviewTranslationKeys {
   'toolbar.error.validationFailed': string;
   'toolbar.error.missingEndNode': string;
   'toolbar.error.noActiveWorkflow': string;
+  'toolbar.generateNameWithAI': string;
+  'toolbar.error.nameGenerationFailed': string;
 
   // Node Palette
   'palette.title': string;
@@ -522,7 +524,6 @@ export interface WebviewTranslationKeys {
 
   // Slack Description AI Generation
   'slack.description.generateWithAI': string;
-  'slack.description.generating': string;
   'slack.description.generateFailed': string;
 
   // Slack Connect

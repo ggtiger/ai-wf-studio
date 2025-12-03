@@ -6,9 +6,10 @@
 
 import type { Workflow } from '@shared/types/messages';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../i18n/i18n-context';
 import { vscode } from '../main';
+import { generateWorkflowName } from '../services/ai-generation-service';
 import { loadWorkflowList, saveWorkflow } from '../services/vscode-bridge';
 import {
   deserializeWorkflow,
@@ -17,6 +18,7 @@ import {
 } from '../services/workflow-service';
 import { useRefinementStore } from '../stores/refinement-store';
 import { createWorkflowFromCanvas, useWorkflowStore } from '../stores/workflow-store';
+import { AiGenerateButton } from './common/AiGenerateButton';
 import { ProcessingOverlay } from './common/ProcessingOverlay';
 
 interface ToolbarProps {
@@ -33,7 +35,7 @@ interface WorkflowListItem {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onError, onStartTour, onShareToSlack }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const {
     nodes,
     edges,
@@ -50,6 +52,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onError, onStartTour, onShareT
   const [isExporting, setIsExporting] = useState(false);
   const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
+  const [isGeneratingName, setIsGeneratingName] = useState(false);
+  const generationNameRequestIdRef = useRef<string | null>(null);
 
   const handleSave = async () => {
     if (!workflowName.trim()) {
@@ -229,6 +233,70 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onError, onStartTour, onShareT
     openChat();
   };
 
+  // Handle AI workflow name generation
+  const handleGenerateWorkflowName = useCallback(async () => {
+    const currentRequestId = `gen-name-${Date.now()}`;
+    generationNameRequestIdRef.current = currentRequestId;
+    setIsGeneratingName(true);
+
+    try {
+      // Serialize current workflow state
+      const workflow = serializeWorkflow(
+        nodes,
+        edges,
+        workflowName || 'Untitled',
+        'Created with Workflow Studio',
+        activeWorkflow?.conversationHistory
+      );
+      const workflowJson = JSON.stringify(workflow, null, 2);
+
+      // Determine target language
+      let targetLanguage = locale;
+      if (locale.startsWith('zh-')) {
+        targetLanguage = locale === 'zh-TW' || locale === 'zh-HK' ? 'zh-TW' : 'zh-CN';
+      } else {
+        targetLanguage = locale.split('-')[0];
+      }
+
+      // Generate name with AI
+      const generatedName = await generateWorkflowName(workflowJson, targetLanguage);
+
+      // Only update if not cancelled
+      if (generationNameRequestIdRef.current === currentRequestId) {
+        setWorkflowName(generatedName);
+      }
+    } catch (error) {
+      // Only show error if not cancelled
+      if (generationNameRequestIdRef.current === currentRequestId) {
+        onError({
+          code: 'AI_GENERATION_ERROR',
+          message: t('toolbar.error.nameGenerationFailed'),
+          details: error,
+        });
+      }
+    } finally {
+      if (generationNameRequestIdRef.current === currentRequestId) {
+        setIsGeneratingName(false);
+        generationNameRequestIdRef.current = null;
+      }
+    }
+  }, [
+    nodes,
+    edges,
+    workflowName,
+    activeWorkflow?.conversationHistory,
+    locale,
+    onError,
+    setWorkflowName,
+    t,
+  ]);
+
+  // Handle cancel name generation
+  const handleCancelNameGeneration = useCallback(() => {
+    generationNameRequestIdRef.current = null;
+    setIsGeneratingName(false);
+  }, []);
+
   return (
     <div
       style={{
@@ -241,24 +309,46 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onError, onStartTour, onShareT
         backgroundColor: 'var(--vscode-editor-background)',
       }}
     >
-      {/* Workflow Name Input */}
-      <input
-        type="text"
-        value={workflowName}
-        onChange={(e) => setWorkflowName(e.target.value)}
-        placeholder={t('toolbar.workflowNamePlaceholder')}
-        className="nodrag"
-        data-tour="workflow-name-input"
-        style={{
-          flex: 1,
-          padding: '4px 8px',
-          backgroundColor: 'var(--vscode-input-background)',
-          color: 'var(--vscode-input-foreground)',
-          border: '1px solid var(--vscode-input-border)',
-          borderRadius: '2px',
-          fontSize: '13px',
-        }}
-      />
+      {/* Workflow Name Input with AI Generate Button (inside input) */}
+      <div style={{ position: 'relative', flex: 1 }}>
+        <input
+          type="text"
+          value={workflowName}
+          onChange={(e) => setWorkflowName(e.target.value)}
+          placeholder={t('toolbar.workflowNamePlaceholder')}
+          disabled={isGeneratingName}
+          className="nodrag"
+          data-tour="workflow-name-input"
+          style={{
+            width: '100%',
+            padding: '4px 44px 4px 8px',
+            backgroundColor: 'var(--vscode-input-background)',
+            color: 'var(--vscode-input-foreground)',
+            border: '1px solid var(--vscode-input-border)',
+            borderRadius: '2px',
+            fontSize: '13px',
+            opacity: isGeneratingName ? 0.7 : 1,
+            boxSizing: 'border-box',
+          }}
+        />
+        {/* AI Generate / Cancel Button (positioned inside input) */}
+        <div
+          style={{
+            position: 'absolute',
+            right: '4px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+          }}
+        >
+          <AiGenerateButton
+            isGenerating={isGeneratingName}
+            onGenerate={handleGenerateWorkflowName}
+            onCancel={handleCancelNameGeneration}
+            generateTooltip={t('toolbar.generateNameWithAI')}
+            cancelTooltip={t('cancel')}
+          />
+        </div>
+      </div>
 
       {/* Save Button */}
       <button
