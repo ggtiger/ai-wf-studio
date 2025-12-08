@@ -1,3 +1,14 @@
+## [3.4.1](https://github.com/breaking-brake/cc-wf-studio/compare/v3.4.0...v3.4.1) (2025-12-08)
+
+### Bug Fixes
+
+* hide unsupported nodes in SubAgentFlow edit mode ([#230](https://github.com/breaking-brake/cc-wf-studio/issues/230)) ([e595d37](https://github.com/breaking-brake/cc-wf-studio/commit/e595d376fe541d8dd4d54652a7a76e7964230bbd))
+* update SubAgentFlow name on canvas after editing ([#233](https://github.com/breaking-brake/cc-wf-studio/issues/233)) ([2419d7c](https://github.com/breaking-brake/cc-wf-studio/commit/2419d7c8f670aa74152336f91e8f0c5457fc7721))
+
+### Improvements
+
+* add AI name generation to SubAgentFlow dialog ([#232](https://github.com/breaking-brake/cc-wf-studio/issues/232)) ([0059d03](https://github.com/breaking-brake/cc-wf-studio/commit/0059d03fa19ed485194775738e12f7e45e871062))
+
 ## [3.4.0](https://github.com/breaking-brake/cc-wf-studio/compare/v3.3.0...v3.4.0) (2025-12-07)
 
 ### Features
