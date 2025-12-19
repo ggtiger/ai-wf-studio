@@ -1,3 +1,13 @@
+## [3.8.3](https://github.com/breaking-brake/cc-wf-studio/compare/v3.8.2...v3.8.3) (2025-12-19)
+
+### Bug Fixes
+
+* clear conversation history and sub-agent flows on workflow reset ([#295](https://github.com/breaking-brake/cc-wf-studio/issues/295)) ([751a479](https://github.com/breaking-brake/cc-wf-studio/commit/751a4792de0444e8097f03f770bb2ad0447f3142))
+
+### Improvements
+
+* use Haiku model for AI naming and description generation ([#294](https://github.com/breaking-brake/cc-wf-studio/issues/294)) ([1314fdc](https://github.com/breaking-brake/cc-wf-studio/commit/1314fdc83d5e446c92c8ab53bf547cfe7900f6f2))
+
 ## [3.8.2](https://github.com/breaking-brake/cc-wf-studio/compare/v3.8.1...v3.8.2) (2025-12-18)
 
 ### Improvements
