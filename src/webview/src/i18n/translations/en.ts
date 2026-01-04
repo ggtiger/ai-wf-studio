@@ -169,8 +169,11 @@ export const enWebviewTranslations: WebviewTranslationKeys = {
   // Skill properties
   'property.skillPath': 'Skill Path',
   'property.scope': 'Scope',
-  'property.scope.personal': 'Personal',
+  'property.scope.user': 'User',
   'property.scope.project': 'Project',
+  'property.scope.local': 'Local',
+  // Legacy key for backward compatibility
+  'property.scope.personal': 'Personal',
   'property.validationStatus': 'Validation Status',
   'property.validationStatus.valid': 'Valid',
   'property.validationStatus.missing': 'Missing',
@@ -331,8 +334,16 @@ export const enWebviewTranslations: WebviewTranslationKeys = {
   'skill.browser.title': 'Browse Skills',
   'skill.browser.description':
     'Select a Claude Code Skill to add to your workflow.\nSkills are specialized capabilities that Claude Code automatically utilizes.',
-  'skill.browser.personalTab': 'Personal',
+  'skill.browser.userTab': 'User',
   'skill.browser.projectTab': 'Project',
+  'skill.browser.localTab': 'Local',
+  // Scope descriptions for beginners
+  'skill.browser.userDescription': 'Available in all projects.',
+  'skill.browser.projectDescription': 'Available only in this project (shared).',
+  'skill.browser.localDescription': 'Available only in this project (private).',
+  'skill.browser.filterPlaceholder': 'Filter by skill name...',
+  // Legacy key for backward compatibility
+  'skill.browser.personalTab': 'Personal',
   'skill.browser.noSkills': 'No Skills found in this directory',
   'skill.browser.loading': 'Loading Skills...',
   'skill.browser.selectButton': 'Add to Workflow',
@@ -368,8 +379,10 @@ export const enWebviewTranslations: WebviewTranslationKeys = {
   'skill.creation.allowedToolsLabel': 'Allowed Tools (optional)',
   'skill.creation.allowedToolsHint': 'Comma-separated list of tool names (e.g., Read, Grep, Glob)',
   'skill.creation.scopeLabel': 'Scope',
-  'skill.creation.scopePersonal': 'Personal (~/.claude/skills/)',
+  'skill.creation.scopeUser': 'User (~/.claude/skills/)',
   'skill.creation.scopeProject': 'Project (.claude/skills/)',
+  // Legacy key for backward compatibility
+  'skill.creation.scopePersonal': 'Personal (~/.claude/skills/)',
   'skill.creation.cancelButton': 'Cancel',
   'skill.creation.createButton': 'Create Skill',
   'skill.creation.creatingButton': 'Creating...',
