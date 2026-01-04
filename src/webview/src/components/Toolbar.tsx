@@ -55,6 +55,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     setActiveWorkflow,
     workflowName,
     setWorkflowName,
+    workflowDescription,
+    setWorkflowDescription,
     clearWorkflow,
     subAgentFlows,
     isFocusMode,
@@ -96,14 +98,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     setIsSaving(true);
     try {
       // Issue #89: Get subAgentFlows from store
-      const { subAgentFlows } = useWorkflowStore.getState();
+      const { subAgentFlows, workflowDescription } = useWorkflowStore.getState();
 
       // Phase 5 (T024): Serialize workflow with conversation history and subAgentFlows
       const workflow = serializeWorkflow(
         nodes,
         edges,
         workflowName,
-        'Created with Workflow Studio',
+        workflowDescription || undefined,
         activeWorkflow?.conversationHistory,
         subAgentFlows
       );
@@ -149,6 +151,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           setNodes(loadedNodes);
           setEdges(loadedEdges);
           setWorkflowName(workflow.name);
+          // Load description from workflow (default to empty string if not present)
+          setWorkflowDescription(workflow.description || '');
           // Set as active workflow to preserve conversation history
           setActiveWorkflow(workflow);
         }
@@ -175,7 +179,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [setNodes, setEdges, setActiveWorkflow, setWorkflowName]);
+  }, [setNodes, setEdges, setActiveWorkflow, setWorkflowName, setWorkflowDescription]);
 
   const handleLoadWorkflow = () => {
     setIsLoadingFile(true);
@@ -197,14 +201,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     setIsExporting(true);
     try {
       // Issue #89: Get subAgentFlows from store for export
-      const { subAgentFlows } = useWorkflowStore.getState();
+      const { subAgentFlows, workflowDescription } = useWorkflowStore.getState();
 
       // Serialize workflow with subAgentFlows
       const workflow = serializeWorkflow(
         nodes,
         edges,
         workflowName,
-        'Created with Workflow Studio',
+        workflowDescription || undefined,
         undefined, // conversationHistory not needed for export
         subAgentFlows
       );
@@ -249,14 +253,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     setIsRunning(true);
     try {
       // Issue #89: Get subAgentFlows from store for run
-      const { subAgentFlows } = useWorkflowStore.getState();
+      const { subAgentFlows, workflowDescription } = useWorkflowStore.getState();
 
       // Serialize workflow with subAgentFlows
       const workflow = serializeWorkflow(
         nodes,
         edges,
         workflowName,
-        'Created with Workflow Studio',
+        workflowDescription || undefined,
         undefined, // conversationHistory not needed for run
         subAgentFlows
       );
@@ -299,7 +303,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         nodes,
         edges,
         workflowName || 'Untitled',
-        'Created with Workflow Studio',
+        workflowDescription || undefined,
         activeWorkflow?.conversationHistory
       );
       const workflowJson = JSON.stringify(workflow, null, 2);
@@ -343,6 +347,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     nodes,
     edges,
     workflowName,
+    workflowDescription,
     activeWorkflow?.conversationHistory,
     locale,
     onError,
@@ -374,7 +379,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       nodes,
       edges,
       workflowName || 'Untitled',
-      'Created with Workflow Studio',
+      workflowDescription || undefined,
       activeWorkflow?.conversationHistory,
       subAgentFlows
     );
@@ -395,6 +400,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     nodes,
     edges,
     workflowName,
+    workflowDescription,
     activeWorkflow?.conversationHistory,
     subAgentFlows,
     setActiveWorkflow,
