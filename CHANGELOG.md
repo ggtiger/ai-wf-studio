@@ -1,3 +1,10 @@
+## [3.15.3](https://github.com/breaking-brake/cc-wf-studio/compare/v3.15.2...v3.15.3) (2026-01-17)
+
+### Bug Fixes
+
+* normalize CRLF line endings for Windows compatibility ([#464](https://github.com/breaking-brake/cc-wf-studio/issues/464)) ([d2e1c5f](https://github.com/breaking-brake/cc-wf-studio/commit/d2e1c5f3069f2f46742d06d9dada7ce7f3cdd740)), closes [#463](https://github.com/breaking-brake/cc-wf-studio/issues/463)
+* use VSCode default terminal to find Claude CLI on Windows ([#465](https://github.com/breaking-brake/cc-wf-studio/issues/465)) ([dfa435b](https://github.com/breaking-brake/cc-wf-studio/commit/dfa435b474c92549d98267ad9b2143556de21eb9))
+
 ## [3.15.2](https://github.com/breaking-brake/cc-wf-studio/compare/v3.15.1...v3.15.2) (2026-01-16)
 
 ### Improvements
