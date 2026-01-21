@@ -333,7 +333,7 @@ const SubAgentFlowDialogContent: React.FC<SubAgentFlowDialogProps> = ({ isOpen, 
         generationNameRequestIdRef.current = null;
       }
     }
-  }, [activeSubAgentFlow, nodes, edges, locale]);
+  }, [activeSubAgentFlow, nodes, edges, locale, selectedProvider, selectedQoderModel]);
 
   // Handle cancel name generation
   const handleCancelNameGeneration = useCallback(() => {

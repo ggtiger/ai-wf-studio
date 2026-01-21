@@ -7,6 +7,8 @@
 
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import type { AiCliProvider } from '../../shared/types/messages';
+import { getConfigDirectory } from './cli-provider-config';
 
 /**
  * File Service for managing workflow files
@@ -14,8 +16,9 @@ import * as vscode from 'vscode';
 export class FileService {
   private readonly workspacePath: string;
   private readonly workflowsDirectory: string;
+  private readonly provider: AiCliProvider;
 
-  constructor() {
+  constructor(provider?: AiCliProvider) {
     // Get workspace root path
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -23,7 +26,11 @@ export class FileService {
     }
 
     this.workspacePath = workspaceFolders[0].uri.fsPath;
-    this.workflowsDirectory = path.join(this.workspacePath, '.vscode', 'workflows');
+    this.provider = provider || 'claude-code';
+
+    // Use provider-specific config directory
+    const configDir = getConfigDirectory(this.provider);
+    this.workflowsDirectory = path.join(this.workspacePath, configDir, 'workflows');
   }
 
   /**
@@ -106,6 +113,13 @@ export class FileService {
    */
   getWorkspacePath(): string {
     return this.workspacePath;
+  }
+
+  /**
+   * Get the current provider
+   */
+  getProvider(): AiCliProvider {
+    return this.provider;
   }
 
   /**

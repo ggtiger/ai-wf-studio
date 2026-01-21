@@ -13,8 +13,8 @@
  */
 
 import nanoSpawn from 'nano-spawn';
-import type { AiCliProvider } from '../../shared/types/messages';
 import type { McpServerReference, McpToolReference } from '../../shared/types/mcp-node';
+import type { AiCliProvider } from '../../shared/types/messages';
 import { log } from '../extension';
 import { getCliSpawnCommand } from './claude-cli-path';
 import { getProviderExecutable } from './cli-provider-config';
@@ -259,7 +259,9 @@ async function executeMcpCommand(
  * @param cwd - Working directory (optional, for project-scoped MCP servers)
  * @returns List of MCP servers (status shown as 'unknown' since we don't health check)
  */
-async function listServersFromConfig(cwd?: string): Promise<McpExecutionResult<McpServerReference[]>> {
+async function listServersFromConfig(
+  cwd?: string
+): Promise<McpExecutionResult<McpServerReference[]>> {
   const startTime = Date.now();
 
   try {
@@ -470,7 +472,12 @@ export async function getServerDetails(
 ): Promise<McpExecutionResult<McpServerReference>> {
   const startTime = Date.now();
 
-  const result = await executeMcpCommand(['mcp', 'get', serverId], DEFAULT_TIMEOUT_MS, undefined, provider);
+  const result = await executeMcpCommand(
+    ['mcp', 'get', serverId],
+    DEFAULT_TIMEOUT_MS,
+    undefined,
+    provider
+  );
   const executionTimeMs = Date.now() - startTime;
 
   if (!result.success) {

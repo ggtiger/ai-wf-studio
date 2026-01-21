@@ -364,7 +364,9 @@ function getStatusColor(status: 'connected' | 'disconnected' | 'error' | 'unknow
 /**
  * Get foreground color for status badge
  */
-function getStatusForegroundColor(status: 'connected' | 'disconnected' | 'error' | 'unknown'): string {
+function getStatusForegroundColor(
+  status: 'connected' | 'disconnected' | 'error' | 'unknown'
+): string {
   switch (status) {
     case 'connected':
     case 'disconnected':

@@ -140,7 +140,7 @@ export class WorkflowPreviewEditorProvider implements vscode.CustomTextEditorPro
         log('INFO', 'Opening workflow in editor from custom editor', { workflowId });
 
         // Open the main Workflow Studio editor
-        await vscode.commands.executeCommand('ai-wf-studio.openEditor');
+        await vscode.commands.executeCommand('cc-wf-studio.openEditor');
 
         // Prepare editor for loading (show loading state)
         prepareEditorForLoad(workflowId);

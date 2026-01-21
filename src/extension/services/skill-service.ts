@@ -9,7 +9,11 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { CreateSkillPayload, SkillReference } from '../../shared/types/messages';
+import type {
+  AiCliProvider,
+  CreateSkillPayload,
+  SkillReference,
+} from '../../shared/types/messages';
 import {
   getInstalledPluginsJsonPath,
   getKnownMarketplacesJsonPath,
@@ -128,8 +132,8 @@ interface MarketplaceConfig {
 /**
  * Load known marketplaces from known_marketplaces.json
  */
-async function loadKnownMarketplaces(): Promise<KnownMarketplaces> {
-  const marketplacesPath = getKnownMarketplacesJsonPath();
+async function loadKnownMarketplaces(provider?: AiCliProvider): Promise<KnownMarketplaces> {
+  const marketplacesPath = getKnownMarketplacesJsonPath(provider);
 
   try {
     const content = await fs.readFile(marketplacesPath, 'utf-8');
@@ -185,8 +189,8 @@ function mapPluginScope(pluginScope: string | undefined): 'user' | 'project' | '
  *
  * @returns Array of Plugin Skill references with their installation scope
  */
-export async function scanPluginSkills(): Promise<SkillReference[]> {
-  const installedPluginsPath = getInstalledPluginsJsonPath();
+export async function scanPluginSkills(provider?: AiCliProvider): Promise<SkillReference[]> {
+  const installedPluginsPath = getInstalledPluginsJsonPath(provider);
   const skills: SkillReference[] = [];
   const currentWorkspace = getWorkspaceRoot();
 
@@ -195,7 +199,7 @@ export async function scanPluginSkills(): Promise<SkillReference[]> {
     // Note: enabledPlugins in settings.json is NOT used to filter plugin skills
     // Plugin presence in installed_plugins.json indicates it's installed and available
     const [knownMarketplaces, installedPluginsContent] = await Promise.all([
-      loadKnownMarketplaces(),
+      loadKnownMarketplaces(provider),
       fs.readFile(installedPluginsPath, 'utf-8'),
     ]);
 
@@ -362,20 +366,21 @@ async function scanMarketplacePlugin(
 /**
  * Scan user, project, and plugin Skills
  *
+ * @param provider - The AI CLI provider (optional, defaults to 'claude-code')
  * @returns Object containing user, project, and local Skills
  */
-export async function scanAllSkills(): Promise<{
+export async function scanAllSkills(provider?: AiCliProvider): Promise<{
   user: SkillReference[];
   project: SkillReference[];
   local: SkillReference[];
 }> {
-  const userDir = getUserSkillsDir();
-  const projectDir = getProjectSkillsDir();
+  const userDir = getUserSkillsDir(provider);
+  const projectDir = getProjectSkillsDir(provider);
 
   const [user, project, pluginSkills] = await Promise.all([
     scanSkills(userDir, 'user'),
     projectDir ? scanSkills(projectDir, 'project') : Promise.resolve([]),
-    scanPluginSkills(),
+    scanPluginSkills(provider),
   ]);
 
   // Separate plugin skills by their scope
@@ -435,9 +440,13 @@ export async function validateSkillFile(skillPath: string): Promise<SkillMetadat
  *
  * Implementation: T024-T025
  */
-export async function createSkill(payload: CreateSkillPayload): Promise<string> {
+export async function createSkill(
+  payload: CreateSkillPayload,
+  provider?: AiCliProvider
+): Promise<string> {
   // 1. Get base directory for scope
-  const baseDir = payload.scope === 'user' ? getUserSkillsDir() : getProjectSkillsDir();
+  const baseDir =
+    payload.scope === 'user' ? getUserSkillsDir(provider) : getProjectSkillsDir(provider);
 
   if (!baseDir) {
     throw new Error('No workspace folder is open. Cannot create project Skill.');

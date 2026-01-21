@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 import type { WebviewMessage } from '../../shared/types/messages';
 import { translate } from '../i18n/i18n-service';
 import { cancelGeneration } from '../services/claude-code-service';
+import { getDefaultProvider } from '../services/cli-provider-config';
 import { FileService } from '../services/file-service';
 import { SlackApiService } from '../services/slack-api-service';
 import { executeSlashCommandInTerminal } from '../services/terminal-execution-service';
@@ -80,7 +81,7 @@ export function registerOpenEditorCommand(
   context: vscode.ExtensionContext
 ): vscode.WebviewPanel | null {
   const openEditorCommand = vscode.commands.registerCommand(
-    'ai-wf-studio.openEditor', 
+    'cc-wf-studio.openEditor',
     (importParams?: ImportParameters | vscode.Uri) => {
       // Filter out vscode.Uri objects (file paths) - only process ImportParameters
       // This prevents unintended import when .json files are opened in VSCode
@@ -97,7 +98,8 @@ export function registerOpenEditorCommand(
 
       // Initialize file service
       try {
-        fileService = new FileService();
+        const provider = getDefaultProvider();
+        fileService = new FileService(provider);
       } catch (error) {
         // Check if this is a "no workspace" error
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -242,10 +244,11 @@ export function registerOpenEditorCommand(
               // Run workflow as slash command in terminal
               if (message.payload?.workflow) {
                 try {
-                  // First, export the workflow to .claude format
+                  // First, export the workflow to CLI-specific format
                   const exportResult = await handleExportWorkflowForExecution(
                     message.payload.workflow,
-                    fileService
+                    fileService,
+                    message.payload.provider
                   );
 
                   if (!exportResult.success) {

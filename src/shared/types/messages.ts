@@ -111,6 +111,7 @@ export interface SaveWorkflowPayload {
 export interface ExportWorkflowPayload {
   workflow: Workflow;
   overwriteExisting?: boolean;
+  provider?: AiCliProvider; // Target CLI provider for export
 }
 
 export interface ConfirmOverwritePayload {

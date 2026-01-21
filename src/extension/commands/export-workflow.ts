@@ -44,7 +44,11 @@ export async function handleExportWorkflow(
 
     // Check if files already exist (unless overwrite is confirmed)
     if (!payload.overwriteExisting) {
-      const existingFiles = await checkExistingFiles(payload.workflow, fileService);
+      const existingFiles = await checkExistingFiles(
+        payload.workflow,
+        fileService,
+        payload.provider
+      );
 
       if (existingFiles.length > 0) {
         // Show warning dialog for overwrite confirmation
@@ -67,7 +71,7 @@ export async function handleExportWorkflow(
     }
 
     // Export workflow
-    const exportedFiles = await exportWorkflow(payload.workflow, fileService);
+    const exportedFiles = await exportWorkflow(payload.workflow, fileService, payload.provider);
 
     // Validate exported files
     const validationErrors: string[] = [];
@@ -146,7 +150,8 @@ export interface ExportForExecutionResult {
  */
 export async function handleExportWorkflowForExecution(
   workflow: Workflow,
-  fileService: FileService
+  fileService: FileService,
+  provider?: AiCliProvider
 ): Promise<ExportForExecutionResult> {
   try {
     // Validate workflow structure before export
@@ -160,7 +165,7 @@ export async function handleExportWorkflowForExecution(
     }
 
     // Check if files already exist
-    const existingFiles = await checkExistingFiles(workflow, fileService);
+    const existingFiles = await checkExistingFiles(workflow, fileService, provider);
 
     if (existingFiles.length > 0) {
       // Show warning dialog for overwrite confirmation
@@ -181,7 +186,7 @@ export async function handleExportWorkflowForExecution(
     }
 
     // Export workflow
-    const exportedFiles = await exportWorkflow(workflow, fileService);
+    const exportedFiles = await exportWorkflow(workflow, fileService, provider);
 
     // Validate exported files
     const validationErrors: string[] = [];

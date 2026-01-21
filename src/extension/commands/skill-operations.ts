@@ -9,6 +9,7 @@
 
 import * as vscode from 'vscode';
 import type { CreateSkillPayload, ValidateSkillFilePayload } from '../../shared/types/messages';
+import { getDefaultProvider } from '../services/cli-provider-config';
 import { createSkill, scanAllSkills, validateSkillFile } from '../services/skill-service';
 
 /**
@@ -36,7 +37,8 @@ export async function handleBrowseSkills(
   outputChannel.appendLine(`[Skill Browse] Starting scan (requestId: ${requestId})`);
 
   try {
-    const { user, project, local } = await scanAllSkills();
+    const provider = getDefaultProvider();
+    const { user, project, local } = await scanAllSkills(provider);
     const allSkills = [...user, ...project, ...local];
 
     const executionTime = Date.now() - startTime;
@@ -91,7 +93,8 @@ export async function handleCreateSkill(
   );
 
   try {
-    const skillPath = await createSkill(payload);
+    const provider = getDefaultProvider();
+    const skillPath = await createSkill(payload, provider);
     const executionTime = Date.now() - startTime;
 
     outputChannel.appendLine(`[Skill Create] Skill created in ${executionTime}ms at ${skillPath}`);

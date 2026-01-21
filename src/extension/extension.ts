@@ -10,6 +10,7 @@ import * as vscode from 'vscode';
 import { registerOpenEditorCommand } from './commands/open-editor';
 import { handleConnectSlackManual } from './commands/slack-connect-manual';
 import { WorkflowPreviewEditorProvider } from './editors/workflow-preview-editor-provider';
+import { initializeProviderDetection } from './services/cli-provider-config';
 import { SlackApiService } from './services/slack-api-service';
 import { SlackTokenManager } from './utils/slack-token-manager';
 
@@ -99,6 +100,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(outputChannel);
 
   log('INFO', 'Claude Code Workflow Studio is now active');
+
+  // Initialize provider detection (fire-and-forget)
+  initializeProviderDetection().catch((error) => {
+    log('ERROR', 'Provider detection: Failed to initialize', { error });
+  });
 
   // Clean up legacy BM25 index data (fire-and-forget)
   cleanupLegacyBM25Index(context).catch((error) => {

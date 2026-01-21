@@ -211,20 +211,136 @@ export function getProviderExecutable(provider: AiCliProvider): string {
 }
 
 /**
- * Get default provider from VSCode settings
+ * Detect which CLI provider is currently running this extension
  *
- * @returns Default AI CLI provider
+ * Detection logic:
+ * 1. Check VSCode product name (most reliable)
+ * 2. Check environment variables
+ * 3. Check which CLI executables are available
+ * 4. Fall back to user setting
+ * 5. Default to claude-code
+ *
+ * @returns Detected AI CLI provider
  */
-export function getDefaultProvider(): AiCliProvider {
+export async function detectCurrentProvider(): Promise<AiCliProvider> {
+  // Method 1: Check VSCode product name (most reliable)
+  try {
+    const vscodeEnv = vscode.env;
+    if (vscodeEnv?.appName) {
+      const productName = vscodeEnv.appName.toLowerCase();
+      if (productName.includes('qoder')) {
+        log('INFO', 'Detected Qoder from VSCode appName', { appName: vscodeEnv.appName });
+        return 'qoder';
+      }
+      if (productName.includes('trae')) {
+        log('INFO', 'Detected Trae from VSCode appName', { appName: vscodeEnv.appName });
+        return 'trae';
+      }
+      if (productName.includes('cursor')) {
+        log('INFO', 'Detected Cursor from VSCode appName', { appName: vscodeEnv.appName });
+        return 'claude-code'; // Cursor uses Claude Code CLI
+      }
+    }
+  } catch (error) {
+    log('WARN', 'Failed to check VSCode appName', { error });
+  }
+
+  // Method 2: Check environment variables
+  const appName = process.env.VSCODE_CWD || process.env.TERM_PROGRAM || '';
+  if (appName.toLowerCase().includes('qoder')) {
+    log('INFO', 'Detected Qoder from environment');
+    return 'qoder';
+  }
+  if (appName.toLowerCase().includes('trae')) {
+    log('INFO', 'Detected Trae from environment');
+    return 'trae';
+  }
+
+  // Method 3: Check which CLI executables are available
+  const [qoderAvailable, traeAvailable, claudeAvailable] = await Promise.all([
+    isCliProviderAvailable('qoder'),
+    isCliProviderAvailable('trae'),
+    isCliProviderAvailable('claude-code'),
+  ]);
+
+  // If only one CLI is available, use it
+  const availableCount = [qoderAvailable, traeAvailable, claudeAvailable].filter(Boolean).length;
+  if (availableCount === 1) {
+    if (qoderAvailable) {
+      log('INFO', 'Auto-detected Qoder (only available CLI)');
+      return 'qoder';
+    }
+    if (traeAvailable) {
+      log('INFO', 'Auto-detected Trae (only available CLI)');
+      return 'trae';
+    }
+    if (claudeAvailable) {
+      log('INFO', 'Auto-detected Claude Code (only available CLI)');
+      return 'claude-code';
+    }
+  }
+
+  // Method 4: Fall back to user setting
   const config = vscode.workspace.getConfiguration('cc-wf-studio.ai');
   const provider = config.get<AiCliProvider>('defaultProvider');
 
   if (provider && isValidProvider(provider)) {
-    log('INFO', 'Using default provider from settings', { provider });
+    log('INFO', 'Using provider from settings', { provider });
+    return provider;
+  }
+
+  // Method 5: Default to claude-code
+  log('INFO', 'Using default provider: claude-code');
+  return 'claude-code';
+}
+
+/**
+ * Get default provider from auto-detection or VSCode settings
+ *
+ * @returns Default AI CLI provider
+ */
+export function getDefaultProvider(): AiCliProvider {
+  // For synchronous contexts, we need a cached value
+  // This will be set during extension activation
+  if (cachedProvider) {
+    return cachedProvider;
+  }
+
+  // Fallback: try to detect synchronously (limited detection)
+  try {
+    const vscodeEnv = vscode.env;
+    if (vscodeEnv?.appName) {
+      const productName = vscodeEnv.appName.toLowerCase();
+      if (productName.includes('qoder')) {
+        return 'qoder';
+      }
+      if (productName.includes('trae')) {
+        return 'trae';
+      }
+    }
+  } catch {
+    // Ignore
+  }
+
+  // Check user setting
+  const config = vscode.workspace.getConfiguration('cc-wf-studio.ai');
+  const provider = config.get<AiCliProvider>('defaultProvider');
+  if (provider && isValidProvider(provider)) {
     return provider;
   }
 
   return 'claude-code';
+}
+
+// Cache for detected provider
+let cachedProvider: AiCliProvider | null = null;
+
+/**
+ * Initialize provider detection (call during extension activation)
+ */
+export async function initializeProviderDetection(): Promise<void> {
+  cachedProvider = await detectCurrentProvider();
+  log('INFO', 'Provider detection initialized', { provider: cachedProvider });
 }
 
 /**
@@ -300,16 +416,14 @@ export function getEffectiveModel(
   claudeModel: ClaudeModel = 'sonnet',
   qoderModel: QoderModel = 'auto'
 ): string {
-  switch (provider) {
-    case 'qoder':
-      return qoderModel;
-    case 'copilot':
-      return ''; // Copilot uses vscode-lm-service with its own model handling
-    case 'claude-code':
-    case 'trae':
-    default:
-      return claudeModel;
+  if (provider === 'qoder') {
+    return qoderModel;
   }
+  if (provider === 'copilot') {
+    return ''; // Copilot uses vscode-lm-service with its own model handling
+  }
+  // claude-code and trae use claudeModel
+  return claudeModel;
 }
 
 /**
@@ -470,4 +584,44 @@ export async function isCliProviderAvailable(provider: AiCliProvider): Promise<b
 
   const cliPath = await getCliPath(config.executable);
   return cliPath !== null;
+}
+
+/**
+ * Get the configuration directory name for a provider
+ *
+ * Different IDEs/CLIs use different configuration directories:
+ * - Claude Code / Trae / Copilot: .vscode and .claude
+ * - Qoder: .qoder (lowercase)
+ *
+ * @param provider - The AI CLI provider
+ * @returns Configuration directory name (e.g., '.vscode', '.qoder')
+ */
+export function getConfigDirectory(provider: AiCliProvider): string {
+  if (provider === 'qoder') {
+    return '.qoder';
+  }
+  // claude-code, trae, copilot all use .vscode
+  return '.vscode';
+}
+
+/**
+ * Get the CLI-specific directory name for commands/agents/skills
+ *
+ * Different CLIs use different directory names:
+ * - Claude Code / Trae: .claude
+ * - Qoder: .qoder (lowercase)
+ * - Copilot: .vscode (uses VS Code)
+ *
+ * @param provider - The AI CLI provider
+ * @returns CLI directory name (e.g., '.claude', '.qoder')
+ */
+export function getCliDirectory(provider: AiCliProvider): string {
+  if (provider === 'qoder') {
+    return '.qoder';
+  }
+  if (provider === 'claude-code' || provider === 'trae') {
+    return '.claude';
+  }
+  // copilot uses .vscode
+  return '.vscode';
 }

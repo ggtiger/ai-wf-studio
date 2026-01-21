@@ -12,6 +12,7 @@ import type {
   SubAgentNode,
   Workflow,
 } from '../../shared/types/workflow-definition';
+import { getCliDirectory } from './cli-provider-config';
 import type { FileService } from './file-service';
 import {
   generateExecutionInstructions,
@@ -24,17 +25,22 @@ import {
  *
  * @param workflow - Workflow to export
  * @param fileService - File service instance
+ * @param provider - Target CLI provider for export (optional, defaults to fileService provider)
  * @returns Array of existing file paths (empty if no conflicts)
  */
 export async function checkExistingFiles(
   workflow: Workflow,
-  fileService: FileService
+  fileService: FileService,
+  provider?: AiCliProvider
 ): Promise<string[]> {
   const existingFiles: string[] = [];
   const workspacePath = fileService.getWorkspacePath();
+  const targetProvider = provider || fileService.getProvider();
 
-  const agentsDir = path.join(workspacePath, '.claude', 'agents');
-  const commandsDir = path.join(workspacePath, '.claude', 'commands');
+  // Use provider-specific CLI directory
+  const cliDir = getCliDirectory(targetProvider);
+  const agentsDir = path.join(workspacePath, cliDir, 'agents');
+  const commandsDir = path.join(workspacePath, cliDir, 'commands');
 
   // Check Sub-Agent files
   const subAgentNodes = workflow.nodes.filter((node) => node.type === 'subAgent') as SubAgentNode[];
@@ -71,24 +77,28 @@ export async function checkExistingFiles(
 }
 
 /**
- * Export workflow to .claude format
+ * Export workflow to CLI-specific format
  *
  * @param workflow - Workflow to export
  * @param fileService - File service instance
+ * @param provider - Target CLI provider for export (optional, defaults to fileService provider)
  * @returns Array of exported file paths
  */
 export async function exportWorkflow(
   workflow: Workflow,
-  fileService: FileService
+  fileService: FileService,
+  provider?: AiCliProvider
 ): Promise<string[]> {
   const exportedFiles: string[] = [];
   const workspacePath = fileService.getWorkspacePath();
+  const targetProvider = provider || fileService.getProvider();
 
-  // Create .claude directories if they don't exist
-  const agentsDir = path.join(workspacePath, '.claude', 'agents');
-  const commandsDir = path.join(workspacePath, '.claude', 'commands');
+  // Use provider-specific CLI directory
+  const cliDir = getCliDirectory(targetProvider);
+  const agentsDir = path.join(workspacePath, cliDir, 'agents');
+  const commandsDir = path.join(workspacePath, cliDir, 'commands');
 
-  await fileService.createDirectory(path.join(workspacePath, '.claude'));
+  await fileService.createDirectory(path.join(workspacePath, cliDir));
   await fileService.createDirectory(agentsDir);
   await fileService.createDirectory(commandsDir);
 

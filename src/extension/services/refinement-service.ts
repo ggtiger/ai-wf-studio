@@ -55,7 +55,8 @@ export interface RefinementResult {
       | 'TIMEOUT'
       | 'PARSE_ERROR'
       | 'VALIDATION_ERROR'
-      | 'UNKNOWN_ERROR';
+      | 'UNKNOWN_ERROR'
+      | 'COPILOT_NOT_AVAILABLE';
     message: string;
     details?: string;
   };
@@ -297,7 +298,7 @@ export async function refineWorkflow(
       // Scan skills in parallel with schema loading
       const [loadedSchema, skillsResult] = await Promise.all([
         loadWorkflowSchemaByFormat(extensionPath, schemaFormat),
-        scanAllSkills(),
+        scanAllSkills(provider),
       ]);
 
       schemaResult = loadedSchema;
@@ -939,11 +940,13 @@ export interface SubAgentFlowRefinementResult {
   error?: {
     code:
       | 'COMMAND_NOT_FOUND'
+      | 'MODEL_NOT_SUPPORTED'
       | 'TIMEOUT'
       | 'PARSE_ERROR'
       | 'VALIDATION_ERROR'
       | 'PROHIBITED_NODE_TYPE'
-      | 'UNKNOWN_ERROR';
+      | 'UNKNOWN_ERROR'
+      | 'COPILOT_NOT_AVAILABLE';
     message: string;
     details?: string;
   };
@@ -1173,7 +1176,7 @@ export async function refineSubAgentFlow(
   allowedTools?: string[],
   provider: AiCliProvider = 'claude-code',
   copilotModel: CopilotModel = 'gpt-4o',
-  qoderModel: QoderModel = 'auto'
+  _qoderModel: QoderModel = 'auto'
 ): Promise<SubAgentFlowRefinementResult> {
   const startTime = Date.now();
 
@@ -1203,7 +1206,7 @@ export async function refineSubAgentFlow(
     if (useSkills) {
       const [loadedSchema, skillsResult] = await Promise.all([
         loadWorkflowSchemaByFormat(extensionPath, schemaFormat),
-        scanAllSkills(),
+        scanAllSkills(provider),
       ]);
 
       schemaResult = loadedSchema;
@@ -1266,9 +1269,6 @@ export async function refineSubAgentFlow(
     // Record prompt size for metrics
     const promptSizeChars = prompt.length;
 
-    // Determine which model to use based on provider
-    const effectiveModel = getEffectiveModel(provider, model, qoderModel);
-
     // Step 3: Execute AI
     const cliResult = await executeAi(
       prompt,
@@ -1276,7 +1276,7 @@ export async function refineSubAgentFlow(
       timeoutMs,
       requestId,
       workspaceRoot,
-      effectiveModel,
+      model,
       copilotModel,
       allowedTools
     );

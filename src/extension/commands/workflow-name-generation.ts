@@ -65,7 +65,7 @@ export async function handleGenerateWorkflowName(
       workspaceRoot,
       effectiveModel as 'sonnet' | 'opus' | 'haiku',
       undefined, // copilotModel
-      undefined  // allowedTools
+      undefined // allowedTools
     );
 
     const executionTimeMs = Date.now() - startTime;

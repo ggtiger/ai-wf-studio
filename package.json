@@ -1,5 +1,5 @@
 {
-  "name": "ai-wf-studio",
+  "name": "cc-wf-studio",
   "displayName": "AI Workflow Studio",
   "description": "Visual workflow editor for AI Slash Commands, Sub Agents, Agent Skills, and MCP Tools",
   "version": "3.16.1",
@@ -7,7 +7,7 @@
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ggtiger/ai-wf-studio"
+    "url": "https://github.com/ggtiger/cc-wf-studio"
   },
   "homepage": "https://ggtiger.github.io/",
   "license": "AGPL-3.0-or-later",
@@ -31,7 +31,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "ai-wf-studio.openEditor",
+        "command": "cc-wf-studio.openEditor",
         "title": "AI Workflow Studio: Open Editor",
         "icon": {
           "light": "resources/icon.png",
@@ -49,11 +49,14 @@
     },
     "customEditors": [
       {
-        "viewType": "ai-wf-studio.workflowPreview",
+        "viewType": "cc-wf-studio.workflowPreview",
         "displayName": "Workflow Preview",
         "selector": [
           {
             "filenamePattern": "**/.vscode/workflows/*.json"
+          },
+          {
+            "filenamePattern": "**/.qoder/workflows/*.json"
           }
         ],
         "priority": "default"
@@ -62,7 +65,7 @@
     "configuration": {
       "title": "AI Workflow Studio",
       "properties": {
-        "ai-wf-studio.ai.schemaFormat": {
+        "cc-wf-studio.ai.schemaFormat": {
           "type": "string",
           "enum": [
             "json",
@@ -71,12 +74,12 @@
           "default": "toon",
           "description": "Schema format for AI prompts. 'toon' reduces token consumption by ~23%."
         },
-        "ai-wf-studio.ai.collectMetrics": {
+        "cc-wf-studio.ai.collectMetrics": {
           "type": "boolean",
           "default": false,
           "description": "Collect and log metrics for A/B comparison of schema formats. Note: Prompt format is always 'toon'."
         },
-        "ai-wf-studio.ai.defaultProvider": {
+        "cc-wf-studio.ai.defaultProvider": {
           "type": "string",
           "enum": [
             "claude-code",
@@ -87,7 +90,7 @@
           "default": "claude-code",
           "description": "Default AI CLI provider for workflow generation and refinement."
         },
-        "ai-wf-studio.ai.defaultModel": {
+        "cc-wf-studio.ai.defaultModel": {
           "type": "string",
           "enum": [
             "sonnet",
@@ -97,7 +100,7 @@
           "default": "sonnet",
           "description": "Default model for Claude Code and Trae providers."
         },
-        "ai-wf-studio.ai.defaultQoderModel": {
+        "cc-wf-studio.ai.defaultQoderModel": {
           "type": "string",
           "enum": [
             "auto",
@@ -114,7 +117,7 @@
   },
   "activationEvents": [
     "onUri",
-    "onCustomEditor:ai-wf-studio.workflowPreview"
+    "onCustomEditor:cc-wf-studio.workflowPreview"
   ],
   "scripts": {
     "vscode:prepublish": "npm run build",

@@ -320,10 +320,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       // Validate workflow before export
       validateWorkflow(workflow);
 
-      // Request export
+      // Request export with selected provider
       vscode.postMessage({
         type: 'EXPORT_WORKFLOW',
-        payload: { workflow },
+        payload: {
+          workflow,
+          provider: selectedProvider,
+        },
       });
     } catch (error) {
       // Translate error messages
@@ -581,6 +584,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     onError,
     setWorkflowName,
     t,
+    selectedProvider,
+    selectedQoderModel,
   ]);
 
   // Handle cancel name generation
