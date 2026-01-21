@@ -9,10 +9,10 @@
  */
 
 import type { ChildProcess } from 'node:child_process';
-import nanoSpawn from 'nano-spawn';
-import type { ClaudeModel } from '../../shared/types/messages';
+import type { AiCliProvider, ClaudeModel } from '../../shared/types/messages';
 import { log } from '../extension';
-import { clearClaudeCliPathCache, getClaudeSpawnCommand } from './claude-cli-path';
+import { clearClaudeCliPathCache, getCliSpawnCommand } from './claude-cli-path';
+import { buildCliArgs, buildStreamingCliArgs, getProviderExecutable } from './cli-provider-config';
 
 // Re-export for external use
 export { clearClaudeCliPathCache };
@@ -48,13 +48,20 @@ interface Subprocess extends Promise<Result> {
   stderr: AsyncIterable<string>;
 }
 
-const spawn =
-  nanoSpawn.default ||
-  (nanoSpawn as (
-    file: string,
-    args?: readonly string[],
-    options?: Record<string, unknown>
-  ) => Subprocess);
+type NanoSpawn = (
+  file: string,
+  args?: readonly string[],
+  options?: Record<string, unknown>
+) => Subprocess;
+
+let nanoSpawnPromise: Promise<NanoSpawn> | null = null;
+
+async function getNanoSpawn(): Promise<NanoSpawn> {
+  if (!nanoSpawnPromise) {
+    nanoSpawnPromise = import('nano-spawn').then((mod) => (mod.default ?? mod) as NanoSpawn);
+  }
+  return nanoSpawnPromise;
+}
 
 /**
  * Active generation processes
@@ -82,18 +89,10 @@ export interface ClaudeCodeExecutionResult {
 }
 
 /**
- * Map ClaudeModel type to Claude CLI model alias
- * See: https://code.claude.com/docs/en/model-config.md
- */
-function getCliModelName(model: ClaudeModel): string {
-  // Claude CLI accepts model aliases: 'sonnet', 'opus', 'haiku'
-  return model;
-}
-
-/**
- * Execute Claude Code CLI with a prompt and return the output
+ * Execute an AI CLI (Claude Code, Qoder, Trae) with a prompt and return the output
  *
- * @param prompt - The prompt to send to Claude Code CLI
+ * @param prompt - The prompt to send to the CLI
+ * @param provider - The CLI provider to use (default: 'claude-code')
  * @param timeoutMs - Timeout in milliseconds (default: 60000)
  * @param requestId - Optional request ID for cancellation support
  * @param workingDirectory - Working directory for CLI execution (defaults to current directory)
@@ -101,8 +100,9 @@ function getCliModelName(model: ClaudeModel): string {
  * @param allowedTools - Optional array of allowed tool names (e.g., ['Read', 'Grep', 'Glob'])
  * @returns Execution result with success status and output/error
  */
-export async function executeClaudeCodeCLI(
+export async function executeAiCli(
   prompt: string,
+  provider: AiCliProvider = 'claude-code',
   timeoutMs = 60000,
   requestId?: string,
   workingDirectory?: string,
@@ -111,33 +111,24 @@ export async function executeClaudeCodeCLI(
 ): Promise<ClaudeCodeExecutionResult> {
   const startTime = Date.now();
 
-  const modelName = getCliModelName(model);
+  const executable = getProviderExecutable(provider);
 
-  log('INFO', 'Starting Claude Code CLI execution', {
+  log('INFO', `Starting ${provider} CLI execution`, {
     promptLength: prompt.length,
     timeoutMs,
     model,
-    modelName,
     allowedTools,
     cwd: workingDirectory ?? process.cwd(),
   });
 
   try {
-    // Build CLI arguments
-    const args = ['-p', '-', '--model', modelName];
+    // Build CLI arguments using provider-specific configuration
+    const args = buildCliArgs(provider, { model, allowedTools, workingDirectory });
 
-    // Add --tools and --allowed-tools flags if provided
-    // --tools: whitelist restriction (only these tools available)
-    // --allowed-tools: no permission prompt for these tools
-    if (allowedTools && allowedTools.length > 0) {
-      args.push('--tools', allowedTools.join(','));
-      args.push('--allowed-tools', allowedTools.join(','));
-    }
-
-    // Spawn Claude Code CLI process using nano-spawn (cross-platform compatible)
+    // Spawn AI CLI process using nano-spawn (cross-platform compatible)
     // Use stdin for prompt instead of -p argument to avoid Windows command line length limits
-    // Use claude directly if available, otherwise fall back to npx
-    const spawnCmd = await getClaudeSpawnCommand(args);
+    const spawnCmd = await getCliSpawnCommand(executable, args);
+    const spawn = await getNanoSpawn();
     const subprocess = spawn(spawnCmd.command, spawnCmd.args, {
       cwd: workingDirectory,
       timeout: timeoutMs,
@@ -164,7 +155,7 @@ export async function executeClaudeCodeCLI(
     const executionTimeMs = Date.now() - startTime;
 
     // Success - return stdout
-    log('INFO', 'Claude Code CLI execution succeeded', {
+    log('INFO', `${provider} CLI execution succeeded`, {
       executionTimeMs,
       outputLength: result.stdout.length,
     });
@@ -184,7 +175,7 @@ export async function executeClaudeCodeCLI(
     const executionTimeMs = Date.now() - startTime;
 
     // Log complete error object for debugging
-    log('ERROR', 'Claude Code CLI error caught', {
+    log('ERROR', `${provider} CLI error caught`, {
       errorType: typeof error,
       errorConstructor: error?.constructor?.name,
       errorKeys: error && typeof error === 'object' ? Object.keys(error) : [],
@@ -201,7 +192,7 @@ export async function executeClaudeCodeCLI(
         (error.isTerminated && error.signalName === 'SIGTERM') || error.exitCode === 143;
 
       if (isTimeout) {
-        log('WARN', 'Claude Code CLI execution timed out', {
+        log('WARN', `${provider} CLI execution timed out`, {
           timeoutMs,
           executionTimeMs,
           exitCode: error.exitCode,
@@ -222,7 +213,7 @@ export async function executeClaudeCodeCLI(
 
       // Command not found (ENOENT)
       if (error.code === 'ENOENT') {
-        log('ERROR', 'Claude Code CLI not found', {
+        log('ERROR', `${provider} CLI not found`, {
           errorCode: error.code,
           errorMessage: error.message,
           executionTimeMs,
@@ -232,16 +223,16 @@ export async function executeClaudeCodeCLI(
           success: false,
           error: {
             code: 'COMMAND_NOT_FOUND',
-            message: 'Cannot connect to Claude Code - please ensure it is installed and running',
+            message: `Cannot connect to ${provider} - please ensure it is installed and running`,
             details: error.message,
           },
           executionTimeMs,
         };
       }
 
-      // npx fallback failed - Claude package not found
+      // npx fallback failed - package not found
       if (error.stderr?.includes('could not determine executable to run')) {
-        log('WARN', 'Claude Code CLI not installed (npx fallback failed)', {
+        log('WARN', `${provider} CLI not installed (npx fallback failed)`, {
           stderr: error.stderr,
           executionTimeMs,
         });
@@ -249,7 +240,7 @@ export async function executeClaudeCodeCLI(
           success: false,
           error: {
             code: 'COMMAND_NOT_FOUND',
-            message: 'Claude Code CLI not found. Please install Claude Code to use AI refinement.',
+            message: `${provider} CLI not found. Please install ${provider} to use AI refinement.`,
             details: error.stderr,
           },
           executionTimeMs,
@@ -257,7 +248,7 @@ export async function executeClaudeCodeCLI(
       }
 
       // Non-zero exit code
-      log('ERROR', 'Claude Code CLI execution failed', {
+      log('ERROR', `${provider} CLI execution failed`, {
         exitCode: error.exitCode,
         executionTimeMs,
         stderr: error.stderr?.substring(0, 200), // Log first 200 chars of stderr
@@ -275,7 +266,7 @@ export async function executeClaudeCodeCLI(
     }
 
     // Unknown error type
-    log('ERROR', 'Unexpected error during Claude Code CLI execution', {
+    log('ERROR', `Unexpected error during ${provider} CLI execution`, {
       errorMessage: error instanceof Error ? error.message : String(error),
       executionTimeMs,
     });
@@ -290,6 +281,28 @@ export async function executeClaudeCodeCLI(
       executionTimeMs,
     };
   }
+}
+
+/**
+ * Execute Claude Code CLI with a prompt and return the output (backward compatibility)
+ */
+export async function executeClaudeCodeCLI(
+  prompt: string,
+  timeoutMs = 60000,
+  requestId?: string,
+  workingDirectory?: string,
+  model: ClaudeModel = 'sonnet',
+  allowedTools?: string[]
+): Promise<ClaudeCodeExecutionResult> {
+  return executeAiCli(
+    prompt,
+    'claude-code',
+    timeoutMs,
+    requestId,
+    workingDirectory,
+    model,
+    allowedTools
+  );
 }
 
 /**
@@ -370,7 +383,7 @@ export function parseClaudeCodeOutput(output: string): unknown {
         try {
           const parsed = JSON.parse(jsonBlocks[i]);
           if (parsed && typeof parsed === 'object' && 'status' in parsed) {
-            log('DEBUG', 'Found structured response with status field', {
+            log('INFO', 'Found structured response with status field', {
               blockIndex: i,
               totalBlocks: jsonBlocks.length,
               status: (parsed as Record<string, unknown>).status,
@@ -383,7 +396,7 @@ export function parseClaudeCodeOutput(output: string): unknown {
       }
 
       // Fallback: Try last block if no status field found
-      log('DEBUG', 'No status field found, using last JSON block', {
+      log('INFO', 'No status field found, using last JSON block', {
         totalBlocks: jsonBlocks.length,
       });
       try {
@@ -464,13 +477,14 @@ export type StreamingProgressCallback = (
 ) => void;
 
 /**
- * Execute Claude Code CLI with streaming output
+ * Execute an AI CLI (Claude Code, Qoder, Trae) with streaming output
  *
- * Uses --output-format stream-json to receive real-time output from Claude Code CLI.
+ * Uses --output-format stream-json to receive real-time output from the CLI.
  * The onProgress callback is invoked for each text chunk received.
  *
- * @param prompt - The prompt to send to Claude Code CLI
+ * @param prompt - The prompt to send to the CLI
  * @param onProgress - Callback invoked with each text chunk and accumulated text
+ * @param provider - The CLI provider to use (default: 'claude-code')
  * @param timeoutMs - Timeout in milliseconds (default: 60000)
  * @param requestId - Optional request ID for cancellation support
  * @param workingDirectory - Working directory for CLI execution
@@ -479,9 +493,10 @@ export type StreamingProgressCallback = (
  * @param resumeSessionId - Session ID to resume (for context continuation)
  * @returns Execution result with success status and output/error
  */
-export async function executeClaudeCodeCLIStreaming(
+export async function executeAiCliStreaming(
   prompt: string,
   onProgress: StreamingProgressCallback,
+  provider: AiCliProvider = 'claude-code',
   timeoutMs = 60000,
   requestId?: string,
   workingDirectory?: string,
@@ -493,40 +508,38 @@ export async function executeClaudeCodeCLIStreaming(
   let accumulated = '';
   let extractedSessionId: string | undefined;
 
-  const modelName = getCliModelName(model);
+  const executable = getProviderExecutable(provider);
 
-  log('INFO', 'Starting Claude Code CLI streaming execution', {
+  log('INFO', `Starting ${provider} CLI streaming execution`, {
+    executable,
     promptLength: prompt.length,
     timeoutMs,
     model,
-    modelName,
     allowedTools,
     resumeSessionId,
     cwd: workingDirectory ?? process.cwd(),
   });
 
   try {
-    // Build CLI arguments
-    const args = ['-p', '-', '--output-format', 'stream-json', '--verbose', '--model', modelName];
+    // Build CLI arguments using provider-specific configuration
+    const args = buildStreamingCliArgs(provider, {
+      model,
+      allowedTools,
+      resumeSessionId,
+      workingDirectory,
+    });
 
-    // Add --resume flag for session continuation
     if (resumeSessionId) {
-      args.push('--resume', resumeSessionId);
-      log('INFO', 'Resuming Claude Code CLI session', { sessionId: resumeSessionId });
+      log('INFO', `Resuming ${provider} CLI session`, { sessionId: resumeSessionId });
     }
 
-    // Add --tools and --allowed-tools flags if provided
-    // --tools: whitelist restriction (only these tools available)
-    // --allowed-tools: no permission prompt for these tools
-    if (allowedTools && allowedTools.length > 0) {
-      args.push('--tools', allowedTools.join(','));
-      args.push('--allowed-tools', allowedTools.join(','));
-    }
-
-    // Spawn Claude Code CLI with streaming output format
-    // Note: --verbose is required when using --output-format=stream-json with -p (print mode)
-    // Use claude directly if available, otherwise fall back to npx
-    const spawnCmd = await getClaudeSpawnCommand(args);
+    // Spawn AI CLI with streaming output format
+    const spawnCmd = await getCliSpawnCommand(executable, args);
+    log('INFO', `Spawning CLI command`, {
+      command: spawnCmd.command,
+      args: spawnCmd.args,
+    });
+    const spawn = await getNanoSpawn();
     const subprocess = spawn(spawnCmd.command, spawnCmd.args, {
       cwd: workingDirectory,
       timeout: timeoutMs,
@@ -560,19 +573,13 @@ export async function executeClaudeCodeCLIStreaming(
           const parsed = JSON.parse(line);
 
           // Log parsed streaming JSON for debugging
-          log('DEBUG', 'Streaming JSON line parsed', {
+          log('INFO', 'Streaming JSON line parsed', {
             type: parsed.type,
             hasMessage: !!parsed.message,
             contentTypes: parsed.message?.content?.map((c: { type: string }) => c.type),
-            // Show content preview (truncated to 500 chars)
-            contentPreview:
-              parsed.type === 'assistant' && parsed.message?.content
-                ? parsed.message.content
-                    .filter((c: { type: string }) => c.type === 'text')
-                    .map((c: { text: string }) => c.text?.substring(0, 200))
-                    .join('')
-                : JSON.stringify(parsed).substring(0, 500),
           });
+
+          // ... (rest of the processing logic)
 
           // Extract session ID from init message (for session continuation)
           if (parsed.type === 'system' && parsed.subtype === 'init' && parsed.session_id) {
@@ -643,7 +650,7 @@ export async function executeClaudeCodeCLIStreaming(
                 // Try to parse as JSON - if successful, skip progress (let success handler show it)
                 try {
                   const jsonResponse = JSON.parse(strippedText);
-                  log('DEBUG', 'JSON parse succeeded in text content handler', {
+                  log('INFO', 'JSON parse succeeded in text content handler', {
                     hasStatus: !!jsonResponse.status,
                     hasMessage: !!jsonResponse.message,
                     hasValues: !!jsonResponse.values,
@@ -655,7 +662,7 @@ export async function executeClaudeCodeCLIStreaming(
                   const looksLikeJsonStart =
                     strippedText.startsWith('{') || trimmedAccumulated.startsWith('```');
 
-                  log('DEBUG', 'JSON parse failed in text content handler', {
+                  log('INFO', 'JSON parse failed in text content handler', {
                     looksLikeJsonStart,
                     strippedTextStartsWith: strippedText.substring(0, 20),
                     trimmedAccumulatedStartsWith: trimmedAccumulated.substring(0, 20),
@@ -667,7 +674,7 @@ export async function executeClaudeCodeCLIStreaming(
                     const jsonBlockIndex = trimmedAccumulated.indexOf('```json');
                     if (jsonBlockIndex !== -1) {
                       explanatoryText = trimmedAccumulated.slice(0, jsonBlockIndex).trim();
-                      log('DEBUG', 'Extracted explanatory text before ```json', {
+                      log('INFO', 'Extracted explanatory text before ```json', {
                         explanatoryTextLength: explanatoryText.length,
                         explanatoryTextPreview: explanatoryText.substring(0, 200),
                       });
@@ -687,7 +694,7 @@ export async function executeClaudeCodeCLIStreaming(
           }
         } catch {
           // Ignore JSON parse errors (may be partial chunks)
-          log('DEBUG', 'Skipping non-JSON line in streaming output', {
+          log('INFO', 'Skipping non-JSON line in streaming output', {
             lineLength: line.length,
           });
         }
@@ -705,7 +712,7 @@ export async function executeClaudeCodeCLIStreaming(
 
     const executionTimeMs = Date.now() - startTime;
 
-    log('INFO', 'Claude Code CLI streaming execution succeeded', {
+    log('INFO', `${provider} CLI streaming execution succeeded`, {
       executionTimeMs,
       accumulatedLength: accumulated.length,
       rawOutputLength: result.stdout.length,
@@ -727,7 +734,7 @@ export async function executeClaudeCodeCLIStreaming(
 
     const executionTimeMs = Date.now() - startTime;
 
-    log('ERROR', 'Claude Code CLI streaming error caught', {
+    log('ERROR', `${provider} CLI streaming error caught`, {
       errorType: typeof error,
       errorConstructor: error?.constructor?.name,
       executionTimeMs,
@@ -745,7 +752,7 @@ export async function executeClaudeCodeCLIStreaming(
         (error.isTerminated && error.signalName === 'SIGTERM') || error.exitCode === 143;
 
       if (isTimeout) {
-        log('WARN', 'Claude Code CLI streaming execution timed out', {
+        log('WARN', `${provider} CLI streaming execution timed out`, {
           timeoutMs,
           executionTimeMs,
           exitCode: error.exitCode,
@@ -771,7 +778,7 @@ export async function executeClaudeCodeCLIStreaming(
           success: false,
           error: {
             code: 'COMMAND_NOT_FOUND',
-            message: 'Cannot connect to Claude Code - please ensure it is installed and running',
+            message: `Cannot connect to ${provider} - please ensure it is installed and running`,
             details: error.message,
           },
           executionTimeMs,
@@ -779,10 +786,10 @@ export async function executeClaudeCodeCLIStreaming(
         };
       }
 
-      // npx fallback failed - Claude package not found
+      // npx fallback failed - package not found
       // stderr contains "could not determine executable to run" when npx can't find the package
       if (error.stderr?.includes('could not determine executable to run')) {
-        log('WARN', 'Claude Code CLI not installed (npx fallback failed)', {
+        log('WARN', `${provider} CLI not installed (npx fallback failed)`, {
           stderr: error.stderr,
           executionTimeMs,
         });
@@ -790,7 +797,7 @@ export async function executeClaudeCodeCLIStreaming(
           success: false,
           error: {
             code: 'COMMAND_NOT_FOUND',
-            message: 'Claude Code CLI not found. Please install Claude Code to use AI refinement.',
+            message: `${provider} CLI not found. Please install ${provider} to use AI refinement.`,
             details: error.stderr,
           },
           executionTimeMs,
@@ -825,6 +832,32 @@ export async function executeClaudeCodeCLIStreaming(
       sessionId: extractedSessionId,
     };
   }
+}
+
+/**
+ * Execute Claude Code CLI with streaming output (backward compatibility)
+ */
+export async function executeClaudeCodeCLIStreaming(
+  prompt: string,
+  onProgress: StreamingProgressCallback,
+  timeoutMs = 60000,
+  requestId?: string,
+  workingDirectory?: string,
+  model: ClaudeModel = 'sonnet',
+  allowedTools?: string[],
+  resumeSessionId?: string
+): Promise<ClaudeCodeExecutionResult> {
+  return executeAiCliStreaming(
+    prompt,
+    onProgress,
+    'claude-code',
+    timeoutMs,
+    requestId,
+    workingDirectory,
+    model,
+    allowedTools,
+    resumeSessionId
+  );
 }
 
 /**

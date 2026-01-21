@@ -16,8 +16,8 @@ export interface McpServerReference {
   name: string;
   /** Configuration scope */
   scope: 'user' | 'project' | 'enterprise';
-  /** Connection status */
-  status: 'connected' | 'disconnected';
+  /** Connection status ('unknown' when read from config without health check) */
+  status: 'connected' | 'disconnected' | 'unknown';
   /** Executable command */
   command: string;
   /** Command arguments */

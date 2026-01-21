@@ -9,6 +9,7 @@ import type {
   AiCliProvider,
   ClaudeModel,
   CopilotModel,
+  QoderModel,
   SkillReference,
 } from '../../shared/types/messages';
 import {
@@ -29,6 +30,7 @@ import {
 } from './ai-metrics-service';
 import { executeAi, executeAiStreaming } from './ai-provider';
 import { parseClaudeCodeOutput, type StreamingProgressCallback } from './claude-code-service';
+import { getEffectiveModel } from './cli-provider-config';
 import { RefinementPromptBuilder } from './refinement-prompt-builder';
 import { loadWorkflowSchemaByFormat, type SchemaLoadResult } from './schema-loader-service';
 import { filterSkillsByRelevance, type SkillRelevanceScore } from './skill-relevance-matcher';
@@ -260,7 +262,8 @@ export async function refineWorkflow(
   allowedTools?: string[],
   previousValidationErrors?: ValidationErrorInfo[],
   provider: AiCliProvider = 'claude-code',
-  copilotModel: CopilotModel = 'gpt-4o'
+  copilotModel: CopilotModel = 'gpt-4o',
+  qoderModel: QoderModel = 'auto'
 ): Promise<RefinementResult> {
   const startTime = Date.now();
 
@@ -279,6 +282,9 @@ export async function refineWorkflow(
     schemaFormat,
     promptFormat: 'toon',
     collectMetrics,
+    provider,
+    model,
+    qoderModel,
   });
 
   try {
@@ -378,6 +384,9 @@ export async function refineWorkflow(
     // Record prompt size for metrics
     const promptSizeChars = prompt.length;
 
+    // Determine which model to use based on provider
+    const effectiveModel = getEffectiveModel(provider, model, qoderModel);
+
     // Step 4: Execute AI (streaming if onProgress callback provided)
     let cliResult = onProgress
       ? await executeAiStreaming(
@@ -387,7 +396,7 @@ export async function refineWorkflow(
           timeoutMs,
           requestId,
           workspaceRoot,
-          model,
+          effectiveModel as ClaudeModel,
           copilotModel,
           allowedTools,
           conversationHistory.sessionId
@@ -398,7 +407,7 @@ export async function refineWorkflow(
           timeoutMs,
           requestId,
           workspaceRoot,
-          model,
+          effectiveModel as ClaudeModel,
           copilotModel,
           allowedTools
         );
@@ -439,7 +448,7 @@ export async function refineWorkflow(
               timeoutMs,
               requestId,
               workspaceRoot,
-              model,
+              effectiveModel as ClaudeModel,
               copilotModel,
               allowedTools,
               undefined // No session ID for retry
@@ -450,7 +459,7 @@ export async function refineWorkflow(
               timeoutMs,
               requestId,
               workspaceRoot,
-              model,
+              effectiveModel as ClaudeModel,
               copilotModel,
               allowedTools
             );
@@ -1148,6 +1157,7 @@ function validateSubAgentFlowNodes(innerWorkflow: InnerWorkflow): {
  * @param allowedTools - Optional array of allowed tool names (e.g., ['Read', 'Grep', 'Glob'])
  * @param provider - AI CLI provider to use (default: 'claude-code')
  * @param copilotModel - Copilot model to use when provider is 'copilot' (default: 'gpt-4o')
+ * @param qoderModel - Qoder model to use when provider is 'qoder' (default: 'auto')
  * @returns SubAgentFlow refinement result
  */
 export async function refineSubAgentFlow(
@@ -1162,7 +1172,8 @@ export async function refineSubAgentFlow(
   model: ClaudeModel = 'sonnet',
   allowedTools?: string[],
   provider: AiCliProvider = 'claude-code',
-  copilotModel: CopilotModel = 'gpt-4o'
+  copilotModel: CopilotModel = 'gpt-4o',
+  qoderModel: QoderModel = 'auto'
 ): Promise<SubAgentFlowRefinementResult> {
   const startTime = Date.now();
 
@@ -1255,6 +1266,9 @@ export async function refineSubAgentFlow(
     // Record prompt size for metrics
     const promptSizeChars = prompt.length;
 
+    // Determine which model to use based on provider
+    const effectiveModel = getEffectiveModel(provider, model, qoderModel);
+
     // Step 3: Execute AI
     const cliResult = await executeAi(
       prompt,
@@ -1262,7 +1276,7 @@ export async function refineSubAgentFlow(
       timeoutMs,
       requestId,
       workspaceRoot,
-      model,
+      effectiveModel,
       copilotModel,
       allowedTools
     );

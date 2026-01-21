@@ -1,5 +1,7 @@
 # Claude Code Workflow Studio
 
+Claude Code 工作流工作室（Workflow Studio）是一个在 VS Code 及兼容编辑器（如 Cursor, Windsurf, Trae, Qoder 等）中可视化设计 Claude Code 工作流的扩展，帮助你通过拖拽和配置节点来搭建复杂的 AI 自动化流程，无需编写代码。
+
 <p align="center">
   <a href="https://github.com/breaking-brake/cc-wf-studio/stargazers"><img src="https://img.shields.io/github/stars/breaking-brake/cc-wf-studio" alt="GitHub Stars" /></a>
   <a href="https://snyk.io/test/github/breaking-brake/cc-wf-studio"><img src="https://snyk.io/test/github/breaking-brake/cc-wf-studio/badge.svg" alt="Known Vulnerabilities" /></a>
@@ -12,11 +14,13 @@
 </p>
 
 <p align="center">
-  <strong>Accelerate Claude Code automation with a visual workflow editor</strong>
+  <strong>Accelerate Claude Code automation with a visual workflow editor (Supports VS Code, Cursor, Windsurf, Trae, Qoder)</strong><br/>
+  <strong>使用可视化编辑器，加速你的 Claude Code 自动化工作流（支持 VS Code, Cursor, Windsurf, Trae, Qoder）</strong>
 </p>
 
 <p align="center">
-  Design complex AI agent workflows intuitively with drag-and-drop. Build Sub-Agent orchestrations and conditional branching without writing code, then export directly to <code>.claude</code> format for immediate execution.
+  Design complex AI agent workflows intuitively with drag-and-drop. Build Sub-Agent orchestrations and conditional branching without writing code, then export directly to <code>.claude</code> format for immediate execution.<br/>
+  通过拖拽直观地设计复杂的 AI Agent 工作流：组合子 Agent、条件分支和用户决策节点，无需写一行代码，即可一键导出为 <code>.claude</code> 文件并立即在 Claude Code 中运行。
 </p>
 
 <!-- Hero image placeholder - recommended size: 1600x900px or 16:9 aspect ratio -->
@@ -67,31 +71,57 @@
 
 ## Why Claude Code Workflow Studio?
 
+## 为什么使用 Claude Code Workflow Studio？
+
 ### 🎯 No-Code Workflow Design
+### 🎯 无需编码的工作流设计
+
 No programming required. Connect Sub-Agent and user decision nodes visually to build sophisticated automation flows.
 
+不需要任何编程基础，就可以通过拖拽节点的方式，连接子 Agent 和用户决策节点，构建复杂而清晰的自动化流程。
+
 ### ⚡ Ready to Execute
+### ⚡ 即刻可用的工作流
+
 Designed workflows automatically export to `.claude/agents/` and `.claude/commands/`. Use them immediately with Claude Code.
 
+在画布中设计好的工作流可以直接导出到 `.claude/agents/` 和 `.claude/commands/` 目录，立即被 Claude Code 识别和执行，无需额外配置。
+
 ### 🔄 Easy Iteration
+### 🔄 便于迭代优化
+
 Save and load workflows as JSON. Experiment and refine your flows through trial and error.
 
+工作流以 JSON 文件形式保存到 `.vscode/workflows/`，你可以随时保存、加载并反复实验，不断微调和优化自动化流程。
+
 ### 🔒 Fully Local & Secure
-All operations run locally within VSCode. **Note:** MCP Tool nodes may require network connectivity depending on the specific MCP server configuration (e.g., remote API servers). Non-MCP features operate entirely offline.
+### 🔒 本地优先且安全
+
+All operations run locally within VS Code and compatible editors (Cursor, Windsurf, Trae, Qoder). **Note:** MCP Tool nodes may require network connectivity depending on the specific MCP server configuration (e.g., remote API servers). Non-MCP features operate entirely offline.
+
+所有核心操作都在本地 VS Code 及兼容编辑器（Cursor, Windsurf, Trae, Qoder）环境中执行，不依赖云端服务。**注意：** 只有在使用某些依赖远程 MCP 服务器的 MCP 工具节点时，才可能需要网络连接；普通工作流设计与导出功能均可完全离线使用。
 
 ## Key Features
 
-✨ **Visual Workflow Editor** - Intuitive drag-and-drop canvas for designing AI workflows without code
+## 关键特性
 
-🤖 **AI-Assisted Workflow Refinement** - Iteratively improve workflows through conversational AI - ask for changes, add features, or refine logic with natural language feedback
+✨ **Visual Workflow Editor** - Intuitive drag-and-drop canvas for designing AI workflows without code  
+✨ **可视化工作流编辑器** - 通过拖拽在画布上直观搭建 AI 工作流，无需写代码
 
-📤 **One-Click Export** - Generate `.claude/agents/*.md` and `.claude/commands/*.md` files ready for immediate use with Claude Code
+🤖 **AI-Assisted Workflow Refinement** - Iteratively improve workflows through conversational AI - ask for changes, add features, or refine logic with natural language feedback  
+🤖 **AI 辅助工作流改进** - 通过对话式 AI 持续迭代工作流，用自然语言提出“修改、加功能、调逻辑”等请求
 
-💬 **Slack Workflow Sharing (β)** - Share workflows directly to Slack channels with preview cards and one-click import links for seamless team collaboration
+📤 **One-Click Export** - Generate `.claude/agents/*.md` and `.claude/commands/*.md` files ready for immediate use with Claude Code  
+📤 **一键导出** - 自动生成 `.claude/agents/*.md` 和 `.claude/commands/*.md` 文件，可立即在 Claude Code 中运行
 
-🤖 **GitHub Copilot Export (β)** - Export workflows to GitHub Copilot format with two execution modes: **VSCode Copilot** (`.github/prompts/*.prompt.md` for Copilot Chat) and **Copilot CLI** (`.github/skills/{name}/SKILL.md` for terminal execution). Select your preferred mode from the dropdown menu. **Note:** This is an experimental feature. Some workflows may not work as expected
+💬 **Slack Workflow Sharing (β)** - Share workflows directly to Slack channels with preview cards and one-click import links for seamless team collaboration  
+💬 **Slack 工作流分享（测试版）** - 将工作流一键分享至 Slack 频道，附带预览卡片与一键导入链接，方便团队协作
 
-🧩 **Rich Node Types** - Build complex workflows with diverse node types: Prompt (templates), Sub-Agent (AI tasks), Skill (Claude Code Skills), MCP (external tools), IfElse/Switch (conditional branching), and AskUserQuestion (user decisions)
+🤖 **GitHub Copilot Export (β)** - Export workflows to GitHub Copilot format with two execution modes: **VSCode Copilot** (`.github/prompts/*.prompt.md` for Copilot Chat) and **Copilot CLI** (`.github/skills/{name}/SKILL.md` for terminal execution). Select your preferred mode from the dropdown menu. **Note:** This is an experimental feature. Some workflows may not work as expected  
+🤖 **GitHub Copilot 导出（测试版）** - 支持导出到 GitHub Copilot，两种执行模式：**VS Code Copilot Chat 提示文件**（`.github/prompts/*.prompt.md`）和 **Copilot CLI 技能**（`.github/skills/{name}/SKILL.md`）。此功能仍在试验中，部分工作流可能需要手动调整。
+
+🧩 **Rich Node Types** - Build complex workflows with diverse node types: Prompt (templates), Sub-Agent (AI tasks), Skill (Claude Code Skills), MCP (external tools), IfElse/Switch (conditional branching), and AskUserQuestion (user decisions)  
+🧩 **丰富的节点类型** - 通过多种节点组合构建复杂流程：Prompt 模板节点、Sub-Agent 子代理节点、Skill 技能节点、MCP 外部工具节点、IfElse/Switch 条件分支节点，以及 AskUserQuestion 用户决策节点。
 
 ## AI-Assisted Workflow Refinement
 

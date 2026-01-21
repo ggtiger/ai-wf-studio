@@ -95,7 +95,7 @@ export const enWebviewTranslations: WebviewTranslationKeys = {
   // Copilot Execution Mode
   'copilot.mode.tooltip': 'Select Copilot execution mode',
   'copilot.mode.cli': 'Copilot CLI',
-  'copilot.mode.vscode': 'VSCode Copilot',
+  'copilot.mode.vscode': 'VS Code / Trae / Qoder / Cursor',
 
   // Node Palette
   'palette.title': 'Node Palette',

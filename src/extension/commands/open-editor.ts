@@ -80,7 +80,7 @@ export function registerOpenEditorCommand(
   context: vscode.ExtensionContext
 ): vscode.WebviewPanel | null {
   const openEditorCommand = vscode.commands.registerCommand(
-    'cc-wf-studio.openEditor',
+    'ai-wf-studio.openEditor', 
     (importParams?: ImportParameters | vscode.Uri) => {
       // Filter out vscode.Uri objects (file paths) - only process ImportParameters
       // This prevents unintended import when .json files are opened in VSCode
@@ -273,6 +273,7 @@ export function registerOpenEditorCommand(
                   const result = executeSlashCommandInTerminal({
                     workflowName: message.payload.workflow.name,
                     workingDirectory: workspacePath,
+                    provider: message.payload.provider,
                   });
 
                   // Send success response
@@ -338,6 +339,24 @@ export function registerOpenEditorCommand(
                   type: 'COPILOT_MODELS_LIST',
                   requestId: message.requestId,
                   payload: result,
+                });
+              }
+              break;
+
+            case 'GET_AI_SETTINGS':
+              // Get AI settings from VSCode configuration
+              {
+                const { getDefaultProvider, getDefaultModel, getDefaultQoderModel } = await import(
+                  '../services/cli-provider-config'
+                );
+                webview.postMessage({
+                  type: 'AI_SETTINGS',
+                  requestId: message.requestId,
+                  payload: {
+                    defaultProvider: getDefaultProvider(),
+                    defaultModel: getDefaultModel(),
+                    defaultQoderModel: getDefaultQoderModel(),
+                  },
                 });
               }
               break;

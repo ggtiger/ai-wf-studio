@@ -10,13 +10,16 @@ import type {
   ClaudeModel,
   CopilotModel,
   CopilotModelInfo,
+  QoderModel,
 } from '@shared/types/messages';
 import type { ConversationHistory, ConversationMessage } from '@shared/types/workflow-definition';
 import { create } from 'zustand';
 import { listCopilotModels } from '../services/refinement-service';
+import { getAiSettings } from '../services/vscode-bridge';
 
 // localStorage keys
 const MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedModel';
+const QODER_MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedQoderModel';
 const COPILOT_MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedCopilotModel';
 const ALLOWED_TOOLS_STORAGE_KEY = 'cc-wf-studio.refinement.allowedTools';
 const PROVIDER_STORAGE_KEY = 'cc-wf-studio.refinement.selectedProvider';
@@ -103,6 +106,39 @@ function saveModelToStorage(model: ClaudeModel): void {
 }
 
 /**
+ * Load selected Qoder model from localStorage
+ * Returns 'auto' as default if no value is stored or value is invalid
+ */
+function loadQoderModelFromStorage(): QoderModel {
+  try {
+    const saved = localStorage.getItem(QODER_MODEL_STORAGE_KEY);
+    if (
+      saved === 'auto' ||
+      saved === 'efficient' ||
+      saved === 'lite' ||
+      saved === 'performance' ||
+      saved === 'ultimate'
+    ) {
+      return saved;
+    }
+  } catch {
+    // localStorage may not be available in some contexts
+  }
+  return 'auto'; // Default
+}
+
+/**
+ * Save selected Qoder model to localStorage
+ */
+function saveQoderModelToStorage(model: QoderModel): void {
+  try {
+    localStorage.setItem(QODER_MODEL_STORAGE_KEY, model);
+  } catch {
+    // localStorage may not be available in some contexts
+  }
+}
+
+/**
  * Load selected Copilot model from localStorage
  * Returns 'claude-haiku-4.5' as default if no value is stored
  * Note: CopilotModel is now a dynamic string type, so any non-empty string is valid
@@ -167,7 +203,7 @@ function saveAllowedToolsToStorage(tools: string[]): void {
 function loadProviderFromStorage(): AiCliProvider {
   try {
     const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
-    if (saved === 'claude-code' || saved === 'copilot') {
+    if (saved === 'claude-code' || saved === 'copilot' || saved === 'qoder' || saved === 'trae') {
       return saved;
     }
   } catch {
@@ -238,6 +274,7 @@ interface RefinementStore {
   useSkills: boolean;
   timeoutSeconds: number;
   selectedModel: ClaudeModel;
+  selectedQoderModel: QoderModel;
   selectedCopilotModel: CopilotModel;
   allowedTools: string[];
   selectedProvider: AiCliProvider;
@@ -262,6 +299,7 @@ interface RefinementStore {
   toggleUseSkills: () => void;
   setTimeoutSeconds: (seconds: number) => void;
   setSelectedModel: (model: ClaudeModel) => void;
+  setSelectedQoderModel: (model: QoderModel) => void;
   setSelectedCopilotModel: (model: CopilotModel) => void;
   setAllowedTools: (tools: string[]) => void;
   toggleAllowedTool: (toolName: string) => void;
@@ -331,6 +369,9 @@ interface RefinementStore {
   canSend: () => boolean;
   shouldShowWarning: () => boolean;
 
+  // AI Settings
+  fetchAiSettings: () => Promise<void>;
+
   // ============================================================================
   // DEBUG: Temporary sessionId editor for testing session reconnection
   // TODO: Remove this before merging to main
@@ -355,6 +396,7 @@ export const useRefinementStore = create<RefinementStore>((set, get) => ({
   useSkills: true,
   timeoutSeconds: 0, // Default timeout: None (0 = use system guard)
   selectedModel: loadModelFromStorage(), // Load from localStorage, default: 'haiku'
+  selectedQoderModel: loadQoderModelFromStorage(), // Load from localStorage, default: 'auto'
   selectedCopilotModel: loadCopilotModelFromStorage(), // Load from localStorage, default: 'gpt-4o'
   allowedTools: loadAllowedToolsFromStorage(), // Load from localStorage, default: DEFAULT_ALLOWED_TOOLS
   selectedProvider: loadProviderFromStorage(), // Load from localStorage, default: 'claude-code'
@@ -396,6 +438,11 @@ export const useRefinementStore = create<RefinementStore>((set, get) => ({
   setSelectedModel: (model: ClaudeModel) => {
     set({ selectedModel: model });
     saveModelToStorage(model);
+  },
+
+  setSelectedQoderModel: (model: QoderModel) => {
+    set({ selectedQoderModel: model });
+    saveQoderModelToStorage(model);
   },
 
   setSelectedCopilotModel: (model: CopilotModel) => {
@@ -770,6 +817,37 @@ export const useRefinementStore = create<RefinementStore>((set, get) => ({
 
     // Show warning when 20 or more iterations have been completed
     return conversationHistory.currentIteration >= 20;
+  },
+
+  // AI Settings
+  fetchAiSettings: async () => {
+    try {
+      const settings = await getAiSettings();
+
+      // Only apply settings if localStorage doesn't have saved values
+      // (user preferences take precedence over VSCode settings)
+      const savedProvider = localStorage.getItem(PROVIDER_STORAGE_KEY);
+      const savedModel = localStorage.getItem(MODEL_STORAGE_KEY);
+      const savedQoderModel = localStorage.getItem(QODER_MODEL_STORAGE_KEY);
+
+      if (!savedProvider) {
+        set({ selectedProvider: settings.defaultProvider });
+        saveProviderToStorage(settings.defaultProvider);
+      }
+
+      if (!savedModel) {
+        set({ selectedModel: settings.defaultModel });
+        saveModelToStorage(settings.defaultModel);
+      }
+
+      if (!savedQoderModel) {
+        set({ selectedQoderModel: settings.defaultQoderModel });
+        saveQoderModelToStorage(settings.defaultQoderModel);
+      }
+    } catch (error) {
+      // Silently fail - use existing defaults
+      console.warn('Failed to fetch AI settings:', error);
+    }
   },
 
   // ============================================================================

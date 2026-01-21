@@ -1,0 +1,64 @@
+{
+  "id": "workflow-1768897851188",
+  "name": "my-workflow",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "start-node-default",
+      "type": "start",
+      "name": "start-node-default",
+      "position": {
+        "x": -225,
+        "y": 90
+      },
+      "data": {
+        "label": "Start"
+      }
+    },
+    {
+      "id": "end-node-default",
+      "type": "end",
+      "name": "end-node-default",
+      "position": {
+        "x": 645,
+        "y": 0
+      },
+      "data": {
+        "label": "End"
+      }
+    },
+    {
+      "id": "prompt-1768897656664",
+      "type": "prompt",
+      "name": "prompt-1768897656664",
+      "position": {
+        "x": 15,
+        "y": 45
+      },
+      "data": {
+        "label": "新Prompt",
+        "prompt": "我想开发一个自动整理我桌面文档的工具，它可以根据文件类型将文件分类并移动到指定的文件夹中。\n\n例如，将所有的PDF文件移动到一个名为“PDFs”的文件夹中，将所有的图片文件移动到一个名为“Images”的文件夹中，将所有的文本文件移动到一个名为“Texts”的文件夹中。    \n通过AI建议帮我归类\n",
+        "variables": {}
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "reactflow__edge-start-node-defaultout-prompt-1768897656664in",
+      "from": "start-node-default",
+      "to": "prompt-1768897656664",
+      "fromPort": "out",
+      "toPort": "in"
+    },
+    {
+      "id": "reactflow__edge-prompt-1768897656664out-end-node-defaultin",
+      "from": "prompt-1768897656664",
+      "to": "end-node-default",
+      "fromPort": "out",
+      "toPort": "in"
+    }
+  ],
+  "createdAt": "2026-01-20T08:30:51.188Z",
+  "updatedAt": "2026-01-20T08:30:51.188Z",
+  "subAgentFlows": []
+}

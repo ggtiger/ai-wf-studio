@@ -31,6 +31,7 @@ import {
   cancelWorkflowNameGeneration,
   generateWorkflowName,
 } from '../../services/ai-generation-service';
+import { useRefinementStore } from '../../stores/refinement-store';
 import { useWorkflowStore } from '../../stores/workflow-store';
 import { EditableNameField } from '../common/EditableNameField';
 import { StyledTooltip } from '../common/StyledTooltip';
@@ -116,6 +117,8 @@ const SubAgentFlowDialogContent: React.FC<SubAgentFlowDialogProps> = ({ isOpen, 
     updateActiveWorkflowMetadata,
     ensureActiveWorkflow,
   } = useWorkflowStore();
+
+  const { selectedProvider, selectedQoderModel } = useRefinementStore();
 
   // Local state for panel display (independent from main canvas)
   const [localSelectedNodeId, setLocalSelectedNodeId] = useState<string | null>(null);
@@ -303,7 +306,9 @@ const SubAgentFlowDialogContent: React.FC<SubAgentFlowDialogProps> = ({ isOpen, 
         subAgentFlowJson,
         targetLanguage,
         30000,
-        currentRequestId
+        currentRequestId,
+        selectedProvider,
+        selectedQoderModel
       );
 
       // Only update if not cancelled

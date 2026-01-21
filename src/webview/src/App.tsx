@@ -98,6 +98,11 @@ const App: React.FC = () => {
     refinementStore.closeChat();
   }, [refinementStore]);
 
+  // Fetch AI settings from VSCode configuration on mount
+  useEffect(() => {
+    refinementStore.fetchAiSettings();
+  }, [refinementStore]);
+
   // Issue #384: Sync conversation history from refinement-store to workflow-store
   // This ensures that conversation history is preserved when the refinement panel
   // is collapsed/expanded, and is included when the workflow is saved.

@@ -6,6 +6,8 @@
  */
 
 import type {
+  AiCliProvider,
+  AiSettingsPayload,
   EditorContentUpdatedPayload,
   ExportForCopilotCliPayload,
   ExportForCopilotCliSuccessPayload,
@@ -186,9 +188,10 @@ export function sendStateUpdate(
  * runs it as a slash command in a new VSCode integrated terminal.
  *
  * @param workflow - Workflow to run
+ * @param provider - AI CLI provider to use for execution (default: 'claude-code')
  * @returns Promise that resolves when run starts successfully
  */
-export function runAsSlashCommand(workflow: Workflow): Promise<void> {
+export function runAsSlashCommand(workflow: Workflow, provider?: AiCliProvider): Promise<void> {
   return new Promise((resolve, reject) => {
     const requestId = `req-${Date.now()}-${Math.random()}`;
 
@@ -213,7 +216,7 @@ export function runAsSlashCommand(workflow: Workflow): Promise<void> {
     window.addEventListener('message', handler);
 
     // Send request
-    const payload: RunAsSlashCommandPayload = { workflow };
+    const payload: RunAsSlashCommandPayload = { workflow, provider };
     vscode.postMessage({
       type: 'RUN_AS_SLASH_COMMAND',
       requestId,
@@ -483,5 +486,48 @@ export function openExternalUrl(url: string): void {
   vscode.postMessage({
     type: 'OPEN_EXTERNAL_URL',
     payload: { url },
+  });
+}
+
+/**
+ * Get AI settings from VSCode configuration
+ *
+ * @returns Promise that resolves with AI settings (default provider and model)
+ */
+export function getAiSettings(): Promise<AiSettingsPayload> {
+  return new Promise((resolve, reject) => {
+    const requestId = `req-${Date.now()}-${Math.random()}`;
+
+    const handler = (event: MessageEvent) => {
+      const message: ExtensionMessage = event.data;
+
+      if (message.requestId === requestId) {
+        window.removeEventListener('message', handler);
+
+        if (message.type === 'AI_SETTINGS') {
+          resolve(message.payload as AiSettingsPayload);
+        } else if (message.type === 'ERROR') {
+          reject(new Error(message.payload?.message || 'Failed to get AI settings'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    vscode.postMessage({
+      type: 'GET_AI_SETTINGS',
+      requestId,
+    });
+
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      // Return default values on timeout instead of rejecting
+      resolve({
+        defaultProvider: 'claude-code',
+        defaultModel: 'sonnet',
+        defaultQoderModel: 'auto',
+      });
+    }, 5000);
   });
 }

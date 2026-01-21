@@ -4,7 +4,12 @@
  * Handles AI-assisted workflow name generation requests to the Extension Host.
  */
 
-import type { ExtensionMessage, GenerateWorkflowNamePayload } from '@shared/types/messages';
+import type {
+  AiCliProvider,
+  ExtensionMessage,
+  GenerateWorkflowNamePayload,
+  QoderModel,
+} from '@shared/types/messages';
 import { vscode } from '../main';
 
 /**
@@ -28,6 +33,8 @@ export class AIGenerationError extends Error {
  * @param targetLanguage - Target language for the name (en, ja, ko, zh-CN, zh-TW)
  * @param timeoutMs - Optional timeout in milliseconds (default: 30000)
  * @param externalRequestId - Optional external request ID for cancellation support
+ * @param provider - AI CLI provider (default: 'claude-code')
+ * @param qoderModel - Qoder model when provider is 'qoder' (default: 'efficient')
  * @returns Promise that resolves to the generated name (kebab-case)
  * @throws {AIGenerationError} If generation fails
  */
@@ -35,7 +42,9 @@ export function generateWorkflowName(
   workflowJson: string,
   targetLanguage: string,
   timeoutMs = 30000,
-  externalRequestId?: string
+  externalRequestId?: string,
+  provider: AiCliProvider = 'claude-code',
+  qoderModel: QoderModel = 'efficient'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const requestId = externalRequestId || `req-name-${Date.now()}-${Math.random()}`;
@@ -68,6 +77,8 @@ export function generateWorkflowName(
       workflowJson,
       targetLanguage,
       timeoutMs,
+      provider,
+      qoderModel,
     };
 
     vscode.postMessage({

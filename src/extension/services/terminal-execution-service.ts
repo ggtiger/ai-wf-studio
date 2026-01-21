@@ -5,6 +5,8 @@
  */
 
 import * as vscode from 'vscode';
+import type { AiCliProvider } from '../../shared/types/messages';
+import { getProviderExecutable } from './cli-provider-config';
 
 /**
  * Options for executing a slash command in terminal
@@ -14,6 +16,8 @@ export interface TerminalExecutionOptions {
   workflowName: string;
   /** Working directory for the terminal */
   workingDirectory: string;
+  /** AI CLI provider to use (default: 'claude-code') */
+  provider?: AiCliProvider;
 }
 
 /**
@@ -31,7 +35,7 @@ export interface TerminalExecutionResult {
  *
  * Creates a new terminal with the workflow name as the tab title,
  * sets the working directory to the workspace root, and executes
- * the Claude Code CLI with the slash command.
+ * the AI CLI with the slash command.
  *
  * @param options - Terminal execution options
  * @returns Terminal execution result
@@ -39,6 +43,8 @@ export interface TerminalExecutionResult {
 export function executeSlashCommandInTerminal(
   options: TerminalExecutionOptions
 ): TerminalExecutionResult {
+  const provider = options.provider || 'claude-code';
+  const executable = getProviderExecutable(provider);
   const terminalName = `Workflow: ${options.workflowName}`;
 
   // Create a new terminal with the workflow name
@@ -50,9 +56,14 @@ export function executeSlashCommandInTerminal(
   // Show the terminal and focus on it
   terminal.show(true);
 
-  // Execute the Claude Code CLI with the slash command
+  // Execute the AI CLI with the slash command
   // Using double quotes to handle workflow names with spaces
-  terminal.sendText(`claude "/${options.workflowName}"`);
+  // For qoder, use -w flag for working directory
+  if (provider === 'qoder') {
+    terminal.sendText(`${executable} -w "${options.workingDirectory}" "/${options.workflowName}"`);
+  } else {
+    terminal.sendText(`${executable} "/${options.workflowName}"`);
+  }
 
   return {
     terminalName,

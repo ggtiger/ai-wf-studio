@@ -1,26 +1,23 @@
 {
-  "name": "cc-wf-studio",
-  "displayName": "Claude Code Workflow Studio",
-  "description": "Visual workflow editor for Claude Code Slash Commands, Sub Agents, Agent Skills, and MCP Tools",
+  "name": "ai-wf-studio",
+  "displayName": "AI Workflow Studio",
+  "description": "Visual workflow editor for AI Slash Commands, Sub Agents, Agent Skills, and MCP Tools",
   "version": "3.16.1",
-  "publisher": "breaking-brake",
+  "publisher": "ggtiger",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/breaking-brake/cc-wf-studio"
+    "url": "https://github.com/ggtiger/ai-wf-studio"
   },
-  "homepage": "https://breaking-brake.github.io/",
+  "homepage": "https://ggtiger.github.io/",
   "license": "AGPL-3.0-or-later",
   "keywords": [
-    "claude",
-    "claude code",
-    "claudecode",
+    "ai",
     "code",
     "workflow",
     "flow",
     "visual-editor",
     "automation",
-    "ai",
     "mcp"
   ],
   "engines": {
@@ -34,8 +31,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "cc-wf-studio.openEditor",
-        "title": "Claude Code Workflow Studio: Open Editor",
+        "command": "ai-wf-studio.openEditor",
+        "title": "AI Workflow Studio: Open Editor",
         "icon": {
           "light": "resources/icon.png",
           "dark": "resources/icon.png"
@@ -52,7 +49,7 @@
     },
     "customEditors": [
       {
-        "viewType": "cc-wf-studio.workflowPreview",
+        "viewType": "ai-wf-studio.workflowPreview",
         "displayName": "Workflow Preview",
         "selector": [
           {
@@ -63,9 +60,9 @@
       }
     ],
     "configuration": {
-      "title": "Claude Code Workflow Studio",
+      "title": "AI Workflow Studio",
       "properties": {
-        "cc-wf-studio.ai.schemaFormat": {
+        "ai-wf-studio.ai.schemaFormat": {
           "type": "string",
           "enum": [
             "json",
@@ -74,17 +71,50 @@
           "default": "toon",
           "description": "Schema format for AI prompts. 'toon' reduces token consumption by ~23%."
         },
-        "cc-wf-studio.ai.collectMetrics": {
+        "ai-wf-studio.ai.collectMetrics": {
           "type": "boolean",
           "default": false,
           "description": "Collect and log metrics for A/B comparison of schema formats. Note: Prompt format is always 'toon'."
+        },
+        "ai-wf-studio.ai.defaultProvider": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "qoder",
+            "trae",
+            "copilot"
+          ],
+          "default": "claude-code",
+          "description": "Default AI CLI provider for workflow generation and refinement."
+        },
+        "ai-wf-studio.ai.defaultModel": {
+          "type": "string",
+          "enum": [
+            "sonnet",
+            "opus",
+            "haiku"
+          ],
+          "default": "sonnet",
+          "description": "Default model for Claude Code and Trae providers."
+        },
+        "ai-wf-studio.ai.defaultQoderModel": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "efficient",
+            "lite",
+            "performance",
+            "ultimate"
+          ],
+          "default": "auto",
+          "description": "Default model for Qoder provider."
         }
       }
     }
   },
   "activationEvents": [
     "onUri",
-    "onCustomEditor:cc-wf-studio.workflowPreview"
+    "onCustomEditor:ai-wf-studio.workflowPreview"
   ],
   "scripts": {
     "vscode:prepublish": "npm run build",

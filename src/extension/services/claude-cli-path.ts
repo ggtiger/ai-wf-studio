@@ -13,7 +13,6 @@
  */
 
 import * as fs from 'node:fs';
-import nanoSpawn from 'nano-spawn';
 import * as vscode from 'vscode';
 import { log } from '../extension';
 
@@ -25,13 +24,20 @@ interface Result {
   durationMs: number;
 }
 
-const spawn =
-  nanoSpawn.default ||
-  (nanoSpawn as (
-    file: string,
-    args?: readonly string[],
-    options?: Record<string, unknown>
-  ) => Promise<Result>);
+type NanoSpawn = (
+  file: string,
+  args?: readonly string[],
+  options?: Record<string, unknown>
+) => Promise<Result>;
+
+let nanoSpawnPromise: Promise<NanoSpawn> | null = null;
+
+async function getNanoSpawn(): Promise<NanoSpawn> {
+  if (!nanoSpawnPromise) {
+    nanoSpawnPromise = import('nano-spawn').then((mod) => (mod.default ?? mod) as NanoSpawn);
+  }
+  return nanoSpawnPromise;
+}
 
 /**
  * Terminal profile configuration from VSCode settings
@@ -147,6 +153,7 @@ async function findExecutableWithShell(
       timeout = 10000;
     }
 
+    const spawn = await getNanoSpawn();
     const result = await spawn(shellPath, args, { timeout });
 
     log('INFO', `Shell execution completed for ${executable}`, {
@@ -207,41 +214,47 @@ async function findExecutableViaUnixFallback(executable: string): Promise<string
 }
 
 /**
- * Cached Claude CLI path
- * undefined = not checked yet
- * null = not found (use npx fallback)
- * string = path to claude executable
+ * Cached CLI paths
+ * Key: executable name ('claude', 'qoder', 'trae')
+ * Value:
+ *   undefined = not checked yet
+ *   null = not found
+ *   string = path to executable
  */
-let cachedClaudePath: string | null | undefined;
+const cachedCliPaths = new Map<string, string | null | undefined>();
 
 /**
- * Get the path to Claude CLI executable
+ * Get the path to a CLI executable
  * Detection order:
  * 1. VSCode default terminal shell (handles version managers like mise, nvm)
  * 2. Direct PATH lookup (fallback for terminal-launched VSCode)
- * 3. npx fallback (handled in getClaudeSpawnCommand)
  *
- * @returns Path to claude executable (full path or 'claude' for PATH), null for npx fallback
+ * @param executable - The executable name to find ('claude', 'qoder', 'trae')
+ * @returns Path to executable (full path or executable name for PATH), null if not found
  */
-export async function getClaudeCliPath(): Promise<string | null> {
+export async function getCliPath(executable: string): Promise<string | null> {
   // Return cached result if available
-  if (cachedClaudePath !== undefined) {
-    return cachedClaudePath;
+  if (cachedCliPaths.has(executable)) {
+    const cached = cachedCliPaths.get(executable);
+    if (cached !== undefined) return cached;
   }
 
   // 1. Try VSCode default terminal (handles GUI-launched VSCode + version managers)
-  const shellPath = await findExecutableViaDefaultShell('claude');
+  const shellPath = await findExecutableViaDefaultShell(executable);
   if (shellPath) {
     try {
+      // For qoder/trae, we might need a different version check or just check existence
+      // For now, assume --version works for all or just existence is enough
+      const spawn = await getNanoSpawn();
       const result = await spawn(shellPath, ['--version'], { timeout: 5000 });
-      log('INFO', 'Claude CLI found via default shell', {
+      log('INFO', `${executable} CLI found via default shell`, {
         path: shellPath,
         version: result.stdout.trim().substring(0, 50),
       });
-      cachedClaudePath = shellPath;
+      cachedCliPaths.set(executable, shellPath);
       return shellPath;
     } catch (error) {
-      log('WARN', 'Claude CLI found but not executable', {
+      log('WARN', `${executable} CLI found but not executable`, {
         path: shellPath,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -250,56 +263,71 @@ export async function getClaudeCliPath(): Promise<string | null> {
 
   // 2. Fall back to direct PATH lookup (terminal-launched VSCode)
   try {
-    const result = await spawn('claude', ['--version'], { timeout: 5000 });
-    log('INFO', 'Claude CLI found in PATH', {
-      version: result.stdout.trim().substring(0, 50),
-    });
-    cachedClaudePath = 'claude';
-    return 'claude';
+    const spawn = await getNanoSpawn();
+    await spawn(executable, ['--version'], { timeout: 5000 });
+    log('INFO', `${executable} CLI found in PATH`);
+    cachedCliPaths.set(executable, executable);
+    return executable;
   } catch {
-    log('INFO', 'Claude CLI not found, will use npx fallback');
-    cachedClaudePath = null;
+    log('INFO', `${executable} CLI not found`);
+    cachedCliPaths.set(executable, null);
     return null;
   }
 }
 
 /**
- * Clear Claude CLI path cache
- * Useful for testing or when user installs Claude CLI during session
+ * Get the path to Claude CLI executable (backward compatibility)
  */
-export function clearClaudeCliPathCache(): void {
-  cachedClaudePath = undefined;
+export async function getClaudeCliPath(): Promise<string | null> {
+  return getCliPath('claude');
 }
 
 /**
- * Get the command and args for spawning Claude CLI
- * Uses claude directly if available, otherwise falls back to 'npx claude'
- * npx detection order:
- * 1. VSCode default terminal shell (handles version managers)
- * 2. Direct PATH lookup
+ * Clear CLI path cache
+ * Useful for testing or when user installs a CLI during session
+ */
+export function clearClaudeCliPathCache(): void {
+  cachedCliPaths.clear();
+}
+
+/**
+ * Get the command and args for spawning a CLI
+ * Uses executable directly if available, otherwise falls back to 'npx <executable>'
  *
- * @param args - CLI arguments (without 'claude' command itself)
+ * @param executable - The executable name ('claude', 'qoder', 'trae')
+ * @param args - CLI arguments (without the command itself)
  * @returns command and args for spawn
+ */
+export async function getCliSpawnCommand(
+  executable: string,
+  args: string[]
+): Promise<{ command: string; args: string[] }> {
+  const cliPath = await getCliPath(executable);
+
+  if (cliPath) {
+    return { command: cliPath, args };
+  }
+
+  // Fallback to npx for all supported CLIs
+  // 1. Try VSCode default terminal for npx
+  const npxPath = await findExecutableViaDefaultShell('npx');
+  if (npxPath) {
+    log('INFO', `Using npx from default shell for ${executable} fallback`, {
+      path: npxPath,
+    });
+    return { command: npxPath, args: [executable, ...args] };
+  }
+
+  // 2. Final fallback to direct PATH lookup
+  log('INFO', `Using npx from PATH for ${executable} fallback`);
+  return { command: 'npx', args: [executable, ...args] };
+}
+
+/**
+ * Get the command and args for spawning Claude CLI (backward compatibility)
  */
 export async function getClaudeSpawnCommand(
   args: string[]
 ): Promise<{ command: string; args: string[] }> {
-  const claudePath = await getClaudeCliPath();
-
-  if (claudePath) {
-    return { command: claudePath, args };
-  }
-
-  // 1. Try VSCode default terminal for npx (handles version managers like mise, nvm)
-  const npxPath = await findExecutableViaDefaultShell('npx');
-  if (npxPath) {
-    log('INFO', 'Using npx from default shell for Claude CLI fallback', {
-      path: npxPath,
-    });
-    return { command: npxPath, args: ['claude', ...args] };
-  }
-
-  // 2. Final fallback to direct PATH lookup
-  log('INFO', 'Using npx from PATH for Claude CLI fallback');
-  return { command: 'npx', args: ['claude', ...args] };
+  return getCliSpawnCommand('claude', args);
 }

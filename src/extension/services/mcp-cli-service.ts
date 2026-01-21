@@ -1,7 +1,8 @@
 /**
  * MCP CLI Service
  *
- * Wrapper service for executing 'claude mcp' CLI commands.
+ * Wrapper service for executing MCP CLI commands across different providers.
+ * Supports: claude, qodercli, trae
  * Based on: contracts/mcp-cli.schema.json
  *
  * Feature: 001-mcp-natural-language-mode
@@ -12,9 +13,11 @@
  */
 
 import nanoSpawn from 'nano-spawn';
+import type { AiCliProvider } from '../../shared/types/messages';
 import type { McpServerReference, McpToolReference } from '../../shared/types/mcp-node';
 import { log } from '../extension';
-import { getClaudeSpawnCommand } from './claude-cli-path';
+import { getCliSpawnCommand } from './claude-cli-path';
+import { getProviderExecutable } from './cli-provider-config';
 import { getCachedTools, setCachedTools } from './mcp-cache-service';
 
 /**
@@ -104,32 +107,39 @@ function isSubprocessError(error: unknown): error is SubprocessError {
 }
 
 /**
- * Execute a Claude Code MCP CLI command
+ * Execute an MCP CLI command for any supported provider
  *
  * @param args - CLI arguments (e.g., ['mcp', 'list'])
  * @param timeoutMs - Timeout in milliseconds
  * @param cwd - Working directory (optional, defaults to user's home directory)
+ * @param provider - AI CLI provider (default: 'claude-code')
  * @returns Execution result with stdout/stderr
  */
-async function executeClaudeMcpCommand(
+async function executeMcpCommand(
   args: string[],
   timeoutMs = DEFAULT_TIMEOUT_MS,
-  cwd?: string
+  cwd?: string,
+  provider: AiCliProvider = 'claude-code'
 ): Promise<{ success: boolean; stdout: string; stderr: string; exitCode: number | null }> {
   const startTime = Date.now();
 
-  log('INFO', 'Executing claude mcp command', {
+  // Get the executable for this provider
+  const executable = getProviderExecutable(provider);
+
+  log('INFO', 'Executing MCP command', {
+    provider,
+    executable,
     args,
     timeoutMs,
     cwd,
   });
 
   try {
-    // Spawn 'claude' CLI process using nano-spawn (cross-platform compatible)
-    // Use claude directly if available (from known paths or PATH), otherwise fall back to npx
+    // Spawn CLI process using nano-spawn (cross-platform compatible)
+    // Use the provider's executable directly if available, otherwise fall back to npx
     // This handles GUI-launched VSCode where Extension Host doesn't inherit shell PATH
     // See: Issue #375, PR #376
-    const spawnCmd = await getClaudeSpawnCommand(args);
+    const spawnCmd = await getCliSpawnCommand(executable, args);
     const result = await spawn(spawnCmd.command, spawnCmd.args, {
       cwd,
       timeout: timeoutMs,
@@ -141,6 +151,7 @@ async function executeClaudeMcpCommand(
     const executionTimeMs = Date.now() - startTime;
 
     log('INFO', 'MCP CLI command completed', {
+      provider,
       args,
       exitCode: 0,
       executionTimeMs,
@@ -159,6 +170,7 @@ async function executeClaudeMcpCommand(
 
     // Log complete error object for debugging
     log('ERROR', 'MCP CLI error caught', {
+      provider,
       errorType: typeof error,
       errorConstructor: error?.constructor?.name,
       errorKeys: error && typeof error === 'object' ? Object.keys(error) : [],
@@ -171,6 +183,7 @@ async function executeClaudeMcpCommand(
       // Timeout error
       if (error.isTerminated && error.signalName === 'SIGTERM') {
         log('WARN', 'MCP CLI command timed out', {
+          provider,
           args,
           timeoutMs,
           executionTimeMs,
@@ -187,6 +200,7 @@ async function executeClaudeMcpCommand(
       // Command not found (ENOENT)
       if (error.code === 'ENOENT') {
         log('ERROR', 'MCP CLI command error', {
+          provider,
           args,
           errorCode: error.code,
           errorMessage: error.message,
@@ -203,6 +217,7 @@ async function executeClaudeMcpCommand(
 
       // Non-zero exit code
       log('INFO', 'MCP CLI command completed with error', {
+        provider,
         args,
         exitCode: error.exitCode,
         executionTimeMs,
@@ -220,6 +235,7 @@ async function executeClaudeMcpCommand(
 
     // Unknown error type
     log('ERROR', 'Unexpected error during MCP CLI command execution', {
+      provider,
       args,
       errorMessage: error instanceof Error ? error.message : String(error),
       executionTimeMs,
@@ -235,32 +251,97 @@ async function executeClaudeMcpCommand(
 }
 
 /**
+ * List all configured MCP servers from config files
+ *
+ * Provider-agnostic implementation that reads directly from config files.
+ * This is the preferred method as it works regardless of which CLI is installed.
+ *
+ * @param cwd - Working directory (optional, for project-scoped MCP servers)
+ * @returns List of MCP servers (status shown as 'unknown' since we don't health check)
+ */
+async function listServersFromConfig(cwd?: string): Promise<McpExecutionResult<McpServerReference[]>> {
+  const startTime = Date.now();
+
+  try {
+    const { getAllMcpServerIds, getMcpServerConfig } = await import('./mcp-config-reader');
+
+    const serverIds = getAllMcpServerIds(cwd);
+    const servers: McpServerReference[] = [];
+
+    for (const serverId of serverIds) {
+      const config = getMcpServerConfig(serverId, cwd);
+      if (config) {
+        servers.push({
+          id: serverId,
+          name: serverId,
+          scope: 'user', // Default to user scope when read from config
+          status: 'unknown', // Cannot determine without health check
+          command: config.command,
+          args: config.args,
+          type: config.type,
+        });
+      }
+    }
+
+    const executionTimeMs = Date.now() - startTime;
+
+    log('INFO', 'Successfully listed MCP servers from config', {
+      serverCount: servers.length,
+      executionTimeMs,
+    });
+
+    return {
+      success: true,
+      data: servers,
+      executionTimeMs,
+    };
+  } catch (error) {
+    const executionTimeMs = Date.now() - startTime;
+
+    log('ERROR', 'Failed to list MCP servers from config', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      success: false,
+      error: {
+        code: 'MCP_PARSE_ERROR',
+        message: 'Failed to read MCP server configuration',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      executionTimeMs,
+    };
+  }
+}
+
+/**
  * List all configured MCP servers
  *
- * Executes: claude mcp list
+ * Uses the provider's CLI to list MCP servers (e.g., 'claude mcp list', 'qodercli mcp list').
+ * Falls back to config files if CLI fails.
+ *
  * Based on: contracts/mcp-cli.schema.json - McpListCommand
  *
  * @param cwd - Working directory (optional, for project-scoped MCP servers)
+ * @param provider - AI CLI provider (default: 'claude-code')
  * @returns List of MCP servers with connection status
  */
-export async function listServers(cwd?: string): Promise<McpExecutionResult<McpServerReference[]>> {
+export async function listServers(
+  cwd?: string,
+  provider: AiCliProvider = 'claude-code'
+): Promise<McpExecutionResult<McpServerReference[]>> {
   const startTime = Date.now();
 
-  const result = await executeClaudeMcpCommand(['mcp', 'list'], LIST_SERVERS_TIMEOUT_MS, cwd);
+  log('INFO', 'Listing MCP servers', { provider, cwd });
+
+  const result = await executeMcpCommand(['mcp', 'list'], LIST_SERVERS_TIMEOUT_MS, cwd, provider);
   const executionTimeMs = Date.now() - startTime;
 
   if (!result.success) {
-    // Check for ENOENT (command not found)
+    // Check for ENOENT (command not found) - fall back to config files
     if (result.stderr.includes('ENOENT') || result.exitCode === null) {
-      return {
-        success: false,
-        error: {
-          code: 'MCP_CLI_NOT_FOUND',
-          message: 'Claude Code CLI is not installed or not in PATH',
-          details: result.stderr,
-        },
-        executionTimeMs,
-      };
+      log('INFO', `${provider} CLI not found, falling back to config files for MCP servers`);
+      return listServersFromConfig(cwd);
     }
 
     // Check for timeout
@@ -276,21 +357,14 @@ export async function listServers(cwd?: string): Promise<McpExecutionResult<McpS
       };
     }
 
-    log('ERROR', 'MCP list command failed with unknown error', {
+    log('WARN', 'MCP list command failed, falling back to config files', {
       exitCode: result.exitCode,
       stderr: result.stderr,
       stdout: result.stdout,
     });
 
-    return {
-      success: false,
-      error: {
-        code: 'MCP_UNKNOWN_ERROR',
-        message: 'Failed to list MCP servers',
-        details: result.stderr,
-      },
-      executionTimeMs,
-    };
+    // Fall back to config files for any other CLI error
+    return listServersFromConfig(cwd);
   }
 
   // Parse output
@@ -308,20 +382,13 @@ export async function listServers(cwd?: string): Promise<McpExecutionResult<McpS
       executionTimeMs,
     };
   } catch (error) {
-    log('ERROR', 'Failed to parse MCP list output', {
+    log('ERROR', 'Failed to parse MCP list output, falling back to config files', {
       error: error instanceof Error ? error.message : String(error),
       stdout: result.stdout.substring(0, 200),
     });
 
-    return {
-      success: false,
-      error: {
-        code: 'MCP_PARSE_ERROR',
-        message: 'Failed to parse MCP server list',
-        details: error instanceof Error ? error.message : String(error),
-      },
-      executionTimeMs,
-    };
+    // Fall back to config files if CLI output parsing fails
+    return listServersFromConfig(cwd);
   }
 }
 
@@ -390,18 +457,20 @@ function parseMcpListOutput(output: string): McpServerReference[] {
 /**
  * Get detailed information about a specific MCP server
  *
- * Executes: claude mcp get <server-name>
+ * Executes: <provider> mcp get <server-name>
  * Based on: contracts/mcp-cli.schema.json - McpGetCommand
  *
- * @param serverId - Server identifier from 'claude mcp list'
+ * @param serverId - Server identifier from MCP list
+ * @param provider - AI CLI provider (default: 'claude-code')
  * @returns Detailed server information
  */
 export async function getServerDetails(
-  serverId: string
+  serverId: string,
+  provider: AiCliProvider = 'claude-code'
 ): Promise<McpExecutionResult<McpServerReference>> {
   const startTime = Date.now();
 
-  const result = await executeClaudeMcpCommand(['mcp', 'get', serverId]);
+  const result = await executeMcpCommand(['mcp', 'get', serverId], DEFAULT_TIMEOUT_MS, undefined, provider);
   const executionTimeMs = Date.now() - startTime;
 
   if (!result.success) {
@@ -411,7 +480,7 @@ export async function getServerDetails(
         success: false,
         error: {
           code: 'MCP_CLI_NOT_FOUND',
-          message: 'Claude Code CLI is not installed or not in PATH',
+          message: `${provider} CLI is not installed or not in PATH`,
           details: result.stderr,
         },
         executionTimeMs,

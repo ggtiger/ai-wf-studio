@@ -13,6 +13,7 @@ import { NodeType } from '@shared/types/workflow-definition';
 import { useEffect, useState } from 'react';
 import { useMcpCreationWizard, WizardStep } from '../../hooks/useMcpCreationWizard';
 import { useTranslation } from '../../i18n/i18n-context';
+import { useRefinementStore } from '../../stores/refinement-store';
 import { useWorkflowStore } from '../../stores/workflow-store';
 import { McpServerList } from '../mcp/McpServerList';
 import { McpToolList } from '../mcp/McpToolList';
@@ -36,6 +37,7 @@ export function McpNodeDialog({ isOpen, onClose }: McpNodeDialogProps) {
 
   const wizard = useMcpCreationWizard();
   const { addNode, nodes } = useWorkflowStore();
+  const { selectedProvider } = useRefinementStore();
 
   /**
    * Reset validation state when wizard step changes
@@ -229,6 +231,7 @@ export function McpNodeDialog({ isOpen, onClose }: McpNodeDialogProps) {
                   setError(null);
                 }}
                 selectedServerId={wizard.state.selectedServer?.id}
+                provider={selectedProvider}
               />
             </div>
           </div>

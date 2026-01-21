@@ -14,8 +14,8 @@ import { log } from '../extension';
 import {
   type ClaudeCodeExecutionResult,
   cancelRefinement,
-  executeClaudeCodeCLI,
-  executeClaudeCodeCLIStreaming,
+  executeAiCli,
+  executeAiCliStreaming,
   type StreamingProgressCallback,
 } from './claude-code-service';
 import {
@@ -94,8 +94,15 @@ export async function executeAi(
     return executeVsCodeLm(prompt, timeoutMs, requestId, copilotModel);
   }
 
-  // Default: claude-code - Claude Code用モデルを使用
-  return executeClaudeCodeCLI(prompt, timeoutMs, requestId, workingDirectory, model, allowedTools);
+  return executeAiCli(
+    prompt,
+    provider,
+    timeoutMs,
+    requestId,
+    workingDirectory,
+    model,
+    allowedTools
+  );
 }
 
 /**
@@ -143,10 +150,10 @@ export async function executeAiStreaming(
     return executeVsCodeLmStreaming(prompt, onProgress, timeoutMs, requestId, copilotModel);
   }
 
-  // Default: claude-code - Claude Code用モデルを使用
-  return executeClaudeCodeCLIStreaming(
+  return executeAiCliStreaming(
     prompt,
     onProgress,
+    provider,
     timeoutMs,
     requestId,
     workingDirectory,

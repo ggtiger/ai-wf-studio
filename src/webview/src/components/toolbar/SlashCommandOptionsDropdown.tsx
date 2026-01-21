@@ -9,6 +9,7 @@
  */
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import type { AiCliProvider } from '@shared/types/messages';
 import type {
   HookEntry,
   HookType,
@@ -55,6 +56,11 @@ const MODEL_PRESETS: { value: SlashCommandModel; label: string }[] = [
   { value: 'haiku', label: 'haiku' },
   { value: 'sonnet', label: 'sonnet' },
   { value: 'opus', label: 'opus' },
+];
+
+// Qoder models - only 'default' makes sense since Qoder handles model selection differently
+const QODER_MODEL_PRESETS: { value: SlashCommandModel; label: string }[] = [
+  { value: 'default', label: 'default (auto)' },
 ];
 
 const HOOK_TYPES: {
@@ -125,6 +131,8 @@ interface SlashCommandOptionsDropdownProps {
   onDisableModelInvocationChange: (value: boolean) => void;
   argumentHint: string;
   onArgumentHintChange: (hint: string) => void;
+  /** AI CLI provider - affects available model options */
+  provider?: AiCliProvider;
 }
 
 interface NewEntryState {
@@ -148,6 +156,7 @@ export function SlashCommandOptionsDropdown({
   onDisableModelInvocationChange,
   argumentHint,
   onArgumentHintChange,
+  provider = 'claude-code',
 }: SlashCommandOptionsDropdownProps) {
   const { t } = useTranslation();
   const [newEntry, setNewEntry] = useState<Record<HookType, NewEntryState>>({
@@ -161,8 +170,10 @@ export function SlashCommandOptionsDropdown({
     Stop: null,
   });
 
+  // Select model presets based on provider
+  const modelPresets = provider === 'qoder' ? QODER_MODEL_PRESETS : MODEL_PRESETS;
   const currentContextLabel = CONTEXT_PRESETS.find((p) => p.value === context)?.label || 'default';
-  const currentModelLabel = MODEL_PRESETS.find((p) => p.value === model)?.label || 'default';
+  const currentModelLabel = modelPresets.find((p) => p.value === model)?.label || 'default';
   const totalHookEntries = Object.values(hooks).reduce(
     (sum, entries) => sum + (entries?.length || 0),
     0
@@ -602,7 +613,7 @@ export function SlashCommandOptionsDropdown({
                 }}
               >
                 <DropdownMenu.RadioGroup value={model}>
-                  {MODEL_PRESETS.map((preset) => (
+                  {modelPresets.map((preset) => (
                     <DropdownMenu.RadioItem
                       key={preset.value}
                       value={preset.value}

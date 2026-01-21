@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "lib": ["ES2020"],
-    "module": "commonjs",
+    "module": "Node16",
     "rootDir": "./src",
     "outDir": "./out",
     "sourceMap": true,
@@ -10,7 +10,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "resolveJsonModule": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,

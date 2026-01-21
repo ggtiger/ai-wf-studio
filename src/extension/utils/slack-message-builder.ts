@@ -15,6 +15,8 @@ const SUPPORTED_EDITORS = [
   { name: 'VS Code', scheme: 'vscode' },
   { name: 'Cursor', scheme: 'cursor' },
   { name: 'Windsurf', scheme: 'windsurf' },
+  { name: 'Trae', scheme: 'trae' },
+  { name: 'Qoder', scheme: 'qoder' },
   { name: 'Kiro', scheme: 'kiro' },
   { name: 'Antigravity', scheme: 'antigravity' },
 ] as const;

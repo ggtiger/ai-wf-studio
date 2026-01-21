@@ -2,7 +2,7 @@
  * Workflow Name Generation Command Handler
  *
  * Handles GENERATE_WORKFLOW_NAME messages from Webview.
- * Uses Claude Code CLI to generate concise workflow names in kebab-case format.
+ * Uses AI CLI (Claude/Qoder/Trae) to generate concise workflow names in kebab-case format.
  */
 
 import type * as vscode from 'vscode';
@@ -12,7 +12,8 @@ import type {
   WorkflowNameSuccessPayload,
 } from '../../shared/types/messages';
 import { log } from '../extension';
-import { executeClaudeCodeCLI } from '../services/claude-code-service';
+import { executeAi } from '../services/ai-provider';
+import { getEffectiveModel } from '../services/cli-provider-config';
 import { WorkflowNamePromptBuilder } from '../services/workflow-name-prompt-builder';
 
 /** Default timeout for name generation (30 seconds) */
@@ -37,20 +38,35 @@ export async function handleGenerateWorkflowName(
 ): Promise<void> {
   const startTime = Date.now();
 
+  // Get provider and model from payload (default to claude-code/haiku for backward compatibility)
+  const provider = payload.provider || 'claude-code';
+  const effectiveModel = getEffectiveModel(provider, 'haiku', payload.qoderModel || 'efficient');
+
   log('INFO', 'Workflow name generation started', {
     requestId,
     promptFormat: 'toon',
     targetLanguage: payload.targetLanguage,
     workflowJsonLength: payload.workflowJson.length,
+    provider,
+    model: effectiveModel,
   });
 
   try {
     // Construct the prompt
     const prompt = constructNamePrompt(payload.workflowJson, payload.targetLanguage);
 
-    // Execute Claude Code CLI
+    // Execute AI CLI with provider-aware routing
     const timeoutMs = payload.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const result = await executeClaudeCodeCLI(prompt, timeoutMs, requestId, workspaceRoot, 'haiku');
+    const result = await executeAi(
+      prompt,
+      provider,
+      timeoutMs,
+      requestId,
+      workspaceRoot,
+      effectiveModel as 'sonnet' | 'opus' | 'haiku',
+      undefined, // copilotModel
+      undefined  // allowedTools
+    );
 
     const executionTimeMs = Date.now() - startTime;
 

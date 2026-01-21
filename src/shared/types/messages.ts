@@ -151,6 +151,8 @@ export interface CancelRefinementPayload {
 export interface RunAsSlashCommandPayload {
   /** Workflow to run */
   workflow: Workflow;
+  /** AI CLI provider to use for execution (default: 'claude-code') */
+  provider?: AiCliProvider;
 }
 
 /**
@@ -267,11 +269,23 @@ import type { ConversationHistory, ConversationMessage } from './workflow-defini
 export type ClaudeModel = 'sonnet' | 'opus' | 'haiku';
 
 /**
+ * Qoder model selection
+ * - auto: Automatic model selection (default)
+ * - efficient: Efficient model
+ * - lite: Lightweight model (fastest)
+ * - performance: Performance optimized model
+ * - ultimate: Ultimate capability model
+ */
+export type QoderModel = 'auto' | 'efficient' | 'lite' | 'performance' | 'ultimate';
+
+/**
  * AI CLI provider selection
  * - claude-code: Claude Code CLI (default)
  * - copilot: VS Code Language Model API (Copilot)
+ * - qoder: Qoder CLI
+ * - trae: Trae CLI
  */
-export type AiCliProvider = 'claude-code' | 'copilot';
+export type AiCliProvider = 'claude-code' | 'copilot' | 'qoder' | 'trae';
 
 /**
  * Copilot model selection (for VS Code Language Model API)
@@ -306,6 +320,18 @@ export interface CopilotModelsListPayload {
   unavailableReason?: string;
 }
 
+/**
+ * AI settings from VSCode configuration
+ */
+export interface AiSettingsPayload {
+  /** Default AI CLI provider from settings */
+  defaultProvider: AiCliProvider;
+  /** Default model from settings (for Claude Code/Trae) */
+  defaultModel: ClaudeModel;
+  /** Default Qoder model from settings */
+  defaultQoderModel: QoderModel;
+}
+
 export interface RefineWorkflowPayload {
   /** ID of the workflow being refined */
   workflowId: string;
@@ -325,6 +351,8 @@ export interface RefineWorkflowPayload {
   subAgentFlowId?: string;
   /** Claude model to use (default: 'sonnet') */
   model?: ClaudeModel;
+  /** Qoder model to use when provider is 'qoder' (default: 'auto') */
+  qoderModel?: QoderModel;
   /** Allowed tools for Claude Code CLI (optional, e.g., ['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch']) */
   allowedTools?: string[];
   /** Previous validation errors from failed refinement attempt (for retry with error context) */
@@ -476,6 +504,8 @@ export interface ListMcpServersOptions {
 export interface ListMcpServersPayload {
   /** Request options */
   options?: ListMcpServersOptions;
+  /** AI CLI provider - determines how to list servers */
+  provider?: AiCliProvider;
 }
 
 /**
@@ -730,6 +760,7 @@ export type ExtensionMessage =
   | Message<SlackErrorPayload, 'SEARCH_SLACK_WORKFLOWS_FAILED'>
   | Message<SlackOAuthInitiatedPayload, 'SLACK_OAUTH_INITIATED'>
   | Message<CopilotModelsListPayload, 'COPILOT_MODELS_LIST'>
+  | Message<AiSettingsPayload, 'AI_SETTINGS'>
   | Message<SlackOAuthSuccessPayload, 'SLACK_OAUTH_SUCCESS'>
   | Message<SlackErrorPayload, 'SLACK_OAUTH_FAILED'>
   | Message<void, 'SLACK_OAUTH_CANCELLED'>
@@ -810,6 +841,10 @@ export interface GenerateWorkflowNamePayload {
   targetLanguage: string;
   /** Optional timeout in milliseconds (default: 30000) */
   timeoutMs?: number;
+  /** AI CLI provider (default: 'claude-code') */
+  provider?: AiCliProvider;
+  /** Qoder model to use when provider is 'qoder' (default: 'efficient') */
+  qoderModel?: QoderModel;
 }
 
 /**
@@ -1352,6 +1387,7 @@ export type WebviewMessage =
   | Message<void, 'WEBVIEW_READY'>
   | Message<ExportForCopilotPayload, 'EXPORT_FOR_COPILOT'>
   | Message<void, 'LIST_COPILOT_MODELS'>
+  | Message<void, 'GET_AI_SETTINGS'>
   | Message<RunForCopilotPayload, 'RUN_FOR_COPILOT'>
   | Message<RunForCopilotCliPayload, 'RUN_FOR_COPILOT_CLI'>
   | Message<ExportForCopilotCliPayload, 'EXPORT_FOR_COPILOT_CLI'>;

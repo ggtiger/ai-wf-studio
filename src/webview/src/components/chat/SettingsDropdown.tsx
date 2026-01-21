@@ -9,7 +9,7 @@
  */
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import type { AiCliProvider, ClaudeModel } from '@shared/types/messages';
+import type { AiCliProvider, ClaudeModel, QoderModel } from '@shared/types/messages';
 // Edit3 is commented out with Iteration Counter - uncomment when re-enabling
 import {
   Bot,
@@ -34,9 +34,18 @@ const MODEL_PRESETS: { value: ClaudeModel; label: string }[] = [
   { value: 'haiku', label: 'Haiku' },
 ];
 
+const QODER_MODEL_PRESETS: { value: QoderModel; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'efficient', label: 'Efficient' },
+  { value: 'lite', label: 'Lite' },
+  { value: 'performance', label: 'Performance' },
+  { value: 'ultimate', label: 'Ultimate' },
+];
+
 const PROVIDER_PRESETS: { value: AiCliProvider; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
-  { value: 'copilot', label: 'Copilot' },
+  { value: 'qoder', label: 'Qoder' },
+  { value: 'trae', label: 'Trae' },
 ];
 
 // Fixed font sizes for dropdown menu (not responsive)
@@ -58,6 +67,8 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
     isProcessing,
     selectedModel,
     setSelectedModel,
+    selectedQoderModel,
+    setSelectedQoderModel,
     selectedCopilotModel,
     setSelectedCopilotModel,
     allowedTools,
@@ -92,12 +103,24 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
   ]);
 
   const currentModelLabel = MODEL_PRESETS.find((p) => p.value === selectedModel)?.label || 'Sonnet';
+  const currentQoderModelLabel =
+    QODER_MODEL_PRESETS.find((p) => p.value === selectedQoderModel)?.label || 'Auto';
   const currentCopilotModelLabel =
     availableCopilotModels.find((m) => m.family === selectedCopilotModel)?.name ||
     selectedCopilotModel ||
     'Loading...';
+  const providerOptions: { value: AiCliProvider; label: string }[] = isCopilotEnabled
+    ? [...PROVIDER_PRESETS, { value: 'copilot', label: 'Copilot' }]
+    : PROVIDER_PRESETS;
   const currentProviderLabel =
-    PROVIDER_PRESETS.find((p) => p.value === selectedProvider)?.label || 'Claude Code';
+    providerOptions.find((p) => p.value === selectedProvider)?.label || 'Claude Code';
+
+  // Get current model label based on provider
+  const getModelLabel = () => {
+    if (selectedProvider === 'copilot') return currentCopilotModelLabel;
+    if (selectedProvider === 'qoder') return currentQoderModelLabel;
+    return currentModelLabel;
+  };
 
   return (
     <DropdownMenu.Root>
@@ -221,58 +244,142 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
             }}
           />
 
-          {/* Provider Sub-menu - Only shown when Copilot is enabled via More Actions */}
-          {isCopilotEnabled && (
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger
-                disabled={isProcessing}
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger
+              disabled={isProcessing}
+              style={{
+                padding: '8px 12px',
+                fontSize: `${FONT_SIZES.small}px`,
+                color: 'var(--vscode-foreground)',
+                cursor: isProcessing ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                outline: 'none',
+                borderRadius: '2px',
+                opacity: isProcessing ? 0.5 : 1,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ChevronLeft size={14} />
+                <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
+                  {currentProviderLabel}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bot size={14} />
+                <span>{t('refinement.provider.label')}</span>
+              </div>
+            </DropdownMenu.SubTrigger>
+
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent
+                sideOffset={4}
                 style={{
-                  padding: '8px 12px',
-                  fontSize: `${FONT_SIZES.small}px`,
-                  color: 'var(--vscode-foreground)',
-                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  outline: 'none',
-                  borderRadius: '2px',
-                  opacity: isProcessing ? 0.5 : 1,
+                  backgroundColor: 'var(--vscode-dropdown-background)',
+                  border: '1px solid var(--vscode-dropdown-border)',
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+                  zIndex: 10000,
+                  minWidth: '120px',
+                  padding: '4px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <ChevronLeft size={14} />
-                  <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
-                    {currentProviderLabel}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Bot size={14} />
-                  <span>{t('refinement.provider.label')}</span>
-                </div>
-              </DropdownMenu.SubTrigger>
+                <DropdownMenu.RadioGroup value={selectedProvider}>
+                  {providerOptions.map((preset) => (
+                    <DropdownMenu.RadioItem
+                      key={preset.value}
+                      value={preset.value}
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setSelectedProvider(preset.value);
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: `${FONT_SIZES.small}px`,
+                        color: 'var(--vscode-foreground)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        outline: 'none',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <DropdownMenu.ItemIndicator>
+                          <Check size={12} />
+                        </DropdownMenu.ItemIndicator>
+                      </div>
+                      <span>{preset.label}</span>
+                    </DropdownMenu.RadioItem>
+                  ))}
+                </DropdownMenu.RadioGroup>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Sub>
 
-              <DropdownMenu.Portal>
-                <DropdownMenu.SubContent
-                  sideOffset={4}
-                  style={{
-                    backgroundColor: 'var(--vscode-dropdown-background)',
-                    border: '1px solid var(--vscode-dropdown-border)',
-                    borderRadius: '4px',
-                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-                    zIndex: 10000,
-                    minWidth: '120px',
-                    padding: '4px',
-                  }}
-                >
-                  <DropdownMenu.RadioGroup value={selectedProvider}>
-                    {PROVIDER_PRESETS.map((preset) => (
+          {/* Model Sub-menu - Shows different models based on selected provider */}
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger
+              disabled={isProcessing}
+              style={{
+                padding: '8px 12px',
+                fontSize: `${FONT_SIZES.small}px`,
+                color: 'var(--vscode-foreground)',
+                cursor: isProcessing ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                outline: 'none',
+                borderRadius: '2px',
+                opacity: isProcessing ? 0.5 : 1,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ChevronLeft size={14} />
+                <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
+                  {getModelLabel()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Cpu size={14} />
+                <span>{t('refinement.model.label')}</span>
+              </div>
+            </DropdownMenu.SubTrigger>
+
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent
+                sideOffset={4}
+                style={{
+                  backgroundColor: 'var(--vscode-dropdown-background)',
+                  border: '1px solid var(--vscode-dropdown-border)',
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+                  zIndex: 10000,
+                  minWidth: '140px',
+                  padding: '4px',
+                }}
+              >
+                {selectedProvider === 'qoder' ? (
+                  <DropdownMenu.RadioGroup value={selectedQoderModel}>
+                    {QODER_MODEL_PRESETS.map((preset) => (
                       <DropdownMenu.RadioItem
                         key={preset.value}
                         value={preset.value}
                         onSelect={(event) => {
                           event.preventDefault();
-                          setSelectedProvider(preset.value);
+                          setSelectedQoderModel(preset.value);
                         }}
                         style={{
                           padding: '6px 12px',
@@ -303,57 +410,7 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
                       </DropdownMenu.RadioItem>
                     ))}
                   </DropdownMenu.RadioGroup>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Sub>
-          )}
-
-          {/* Model Sub-menu - Shows different models based on selected provider */}
-          <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger
-              disabled={isProcessing}
-              style={{
-                padding: '8px 12px',
-                fontSize: `${FONT_SIZES.small}px`,
-                color: 'var(--vscode-foreground)',
-                cursor: isProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                outline: 'none',
-                borderRadius: '2px',
-                opacity: isProcessing ? 0.5 : 1,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <ChevronLeft size={14} />
-                <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
-                  {selectedProvider === 'claude-code'
-                    ? currentModelLabel
-                    : currentCopilotModelLabel}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Cpu size={14} />
-                <span>{t('refinement.model.label')}</span>
-              </div>
-            </DropdownMenu.SubTrigger>
-
-            <DropdownMenu.Portal>
-              <DropdownMenu.SubContent
-                sideOffset={4}
-                style={{
-                  backgroundColor: 'var(--vscode-dropdown-background)',
-                  border: '1px solid var(--vscode-dropdown-border)',
-                  borderRadius: '4px',
-                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-                  zIndex: 10000,
-                  minWidth: '140px',
-                  padding: '4px',
-                }}
-              >
-                {selectedProvider === 'claude-code' ? (
+                ) : selectedProvider !== 'copilot' ? (
                   <DropdownMenu.RadioGroup value={selectedModel}>
                     {MODEL_PRESETS.map((preset) => (
                       <DropdownMenu.RadioItem
@@ -502,8 +559,7 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
             </DropdownMenu.Portal>
           </DropdownMenu.Sub>
 
-          {/* Allowed Tools Sub-menu - Only show for Claude Code (Copilot doesn't support tools) */}
-          {selectedProvider === 'claude-code' && (
+          {selectedProvider !== 'copilot' && (
             <DropdownMenu.Sub>
               <DropdownMenu.SubTrigger
                 disabled={isProcessing}

@@ -43,6 +43,6 @@ export default defineConfig({
   // Development server configuration
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false,
   },
 });

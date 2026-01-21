@@ -1,5 +1,7 @@
 # Data Model: Claude Code Workflow Studio
 
+# 数据模型：Claude Code Workflow Studio
+
 **Branch**: 001-cc-wf-studio
 **Date**: 2025-11-01
 **Status**: Phase 1 Design
@@ -8,6 +10,13 @@
 
 このドキュメントは、Claude Code Workflow Studio のデータモデル定義を記述します。主要なエンティティ、フィールド、関係性、バリデーションルール、状態遷移を定義します。
 
+（概览的中文说明）  
+本文档定义 Claude Code Workflow Studio 中使用的核心数据模型，包括：  
+- 工作流、节点、连接等实体及其字段  
+- 各实体之间的关系与校验规则  
+- 工作流与节点在编辑过程中的状态流转  
+这些定义直接影响到前端画布表示、文件存储结构以及导出到 `.claude` 配置时的行为。
+
 ---
 
 ## 1. Core Entities
@@ -15,6 +24,12 @@
 ### 1.1 Workflow（ワークフロー）
 
 ワークフローは、複数のノードとその接続関係で構成される実行可能な定義です。
+
+（中文说明）  
+「工作流」是由多个节点及其连接关系组成的可执行定义，是整个系统的数据核心：  
+- 保存节点列表与连线信息  
+- 记录版本、描述、创建/更新时间及元数据  
+这些字段会被用来生成 SlashCommand 文件并控制执行顺序。
 
 #### Fields:
 
@@ -65,6 +80,9 @@ interface WorkflowMetadata {
 
 ノードはワークフロー内の1つの処理単位です。2種類のノードタイプ（AgentSkills、AskUserQuestion）をサポートします。
 
+（中文说明）  
+「节点」表示工作流中的一个处理单元，当前主要支持两类：调用 Sub-Agent 的节点与提出问题进行分支的 AskUserQuestion 节点。所有节点都有统一的基础字段（id、type、name、position、data），具体类型再在 `data` 中扩展。
+
 #### Base Node Fields:
 
 | フィールド | 型 | 必須 | デフォルト | 説明 |
@@ -98,6 +116,12 @@ interface Position {
 ### 1.3 SubAgentNode（Sub-Agentノード）
 
 Sub-Agentノードは、Claude Code の Sub-Agent を呼び出すノードです。
+
+（中文说明）  
+Sub-Agent 节点负责调用 Claude Code 中已定义的 Sub-Agent：  
+- `description` 与 `prompt` 会分别映射到导出 Markdown 的 frontmatter 与正文  
+- `tools`、`model` 控制可用工具与模型选择  
+- `outputPorts` 在 MVP 中固定为 1，对应画布上的单一输出端口
 
 #### Fields:
 
@@ -150,6 +174,12 @@ interface SubAgentData {
 ### 1.4 AskUserQuestionNode（AskUserQuestionノード）
 
 AskUserQuestionノードは、Claude Code の AskUserQuestion ツールを使用して条件分岐を行うノードです。
+
+（中文说明）  
+AskUserQuestion 节点用于在执行过程中向用户提问并根据回答走向不同分支：  
+- `questionText` 是展示给用户的问题文案  
+- `options` 定义 2–4 个选项，每个选项包含 label 与 description  
+- `outputPorts` 数量与选项个数保持一致，用于在画布上连接到后续节点
 
 #### Fields:
 
@@ -210,6 +240,12 @@ interface QuestionOption {
 
 Connectionは2つのノード間の実行順序を表します。
 
+（中文说明）  
+连接（Connection）描述两个节点之间的执行顺序与分支条件：  
+- `from` / `to` 关联起点与终点节点  
+- `fromPort` / `toPort` 关联具体的输入输出端口  
+- 对于 AskUserQuestion 分支，`condition` 需与选项 label 对应，便于导出 SlashCommand 时生成可读的分支描述
+
 #### Fields:
 
 | フィールド | 型 | 必須 | デフォルト | 説明 |
@@ -245,6 +281,8 @@ interface Connection {
 
 ## 2. React Flow Integration Types
 
+## 2. 与 React Flow 的集成类型
+
 React Flow ライブラリとの統合のため、以下の型定義を使用します。
 
 ```typescript
@@ -269,9 +307,14 @@ interface ReactFlowState {
 
 ## 3. File Storage Format
 
+## 3. 文件存储格式
+
 ### 3.1 Workflow Definition File (`.vscode/workflows/{name}.json`)
 
 ワークフロー定義はJSON形式で保存されます。
+
+（中文说明）  
+工作流会以 JSON 文件形式保存在 `.vscode/workflows/` 目录中，包含节点列表、连接数组以及创建/更新时间。这些信息构成了画布还原和后续导出的唯一数据源。
 
 ```json
 {
@@ -366,6 +409,8 @@ interface ReactFlowState {
 
 ### 3.2 Claude Config Export Format
 
+### 3.2 导出为 Claude 配置文件格式
+
 #### Sub-Agent Configuration File (`.claude/agents/{node-name}.md`)
 
 ```markdown
@@ -401,6 +446,8 @@ allowed-tools: Task,AskUserQuestion
 ---
 
 ## 4. State Transitions
+
+## 4. 状态流转
 
 ### 4.1 Workflow Lifecycle
 
@@ -462,11 +509,16 @@ allowed-tools: Task,AskUserQuestion
 
 ## 5. Validation Summary
 
+## 5. 校验规则总结
+
 ### Workflow Level:
 - ✅ ワークフロー名: 1-100文字、ファイル名として有効
 - ✅ バージョン: セマンティックバージョニング形式
 - ✅ ノード数: 最大50ノード
 - ⚠️ 循環参照: MVP版では検出しない（警告のみ）
+
+（工作流级别校验的中文说明）  
+工作流本身需要满足：名称可用作文件名、版本号符合语义化规范、节点数量不超过 50，同时对于循环引用仅在未来版本考虑严格校验，MVP 中最多给出警告。
 
 ### Node Level:
 - ✅ ノード名: 1-50文字、英数字とハイフン・アンダースコア
@@ -474,14 +526,22 @@ allowed-tools: Task,AskUserQuestion
 - ✅ AskUserQuestion 質問文: 1-500文字
 - ✅ AskUserQuestion 選択肢: 2-4個、各ラベル1-50文字、説明1-200文字
 
+（节点级别校验的中文说明）  
+节点需要满足名称长度限制，Sub-Agent 的 prompt 不能为空白串，AskUserQuestion 的问题与选项则需要控制长度并保证有 2–4 个备选分支。
+
 ### Connection Level:
 - ✅ 開始/終了ノード: ワークフロー内に存在すること
 - ✅ ポートID: ノードが持つポートと一致すること
 - ✅ 条件: AskUserQuestionノードからの接続の場合、選択肢ラベルと一致すること
 
+（连接级别校验的中文说明）  
+连接必须引用当前工作流中存在的节点与端口；对于 AskUserQuestion 的分支连接，还要保证 `condition` 与对应选项的 label 一致，以便导出时生成正确的人类可读描述。
+
 ---
 
 ## 6. Extension Points (Future)
+
+## 6. 未来扩展点
 
 MVP版では実装しませんが、将来の拡張を考慮した設計上のポイント:
 

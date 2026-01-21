@@ -49,13 +49,15 @@ export async function handleListMcpServers(
   log('INFO', 'LIST_MCP_SERVERS request started', {
     requestId,
     filterByScope: payload.options?.filterByScope,
+    provider: payload.provider,
   });
 
   try {
     // Get workspace folder for project-scoped MCP servers
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const provider = payload.provider || 'claude-code';
 
-    // Check cache first
+    // Check cache first (only use cache for same provider scenario)
     const cached = getCachedServerList();
     if (cached) {
       const executionTimeMs = Date.now() - startTime;
@@ -85,8 +87,8 @@ export async function handleListMcpServers(
       return;
     }
 
-    // Cache miss - execute CLI command with workspace folder
-    const result = await listServers(workspaceFolder);
+    // Cache miss - execute CLI command with workspace folder and provider
+    const result = await listServers(workspaceFolder, provider);
     const executionTimeMs = Date.now() - startTime;
 
     if (!result.success || !result.data) {

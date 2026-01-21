@@ -53,6 +53,7 @@ export async function handleRefineWorkflow(
     targetType = 'workflow',
     subAgentFlowId,
     model = 'sonnet',
+    qoderModel = 'auto',
     allowedTools,
     previousValidationErrors,
     provider = 'claude-code',
@@ -74,6 +75,7 @@ export async function handleRefineWorkflow(
     targetType,
     subAgentFlowId,
     model,
+    qoderModel,
     allowedTools,
     hasPreviousErrors: !!previousValidationErrors && previousValidationErrors.length > 0,
     previousErrorCount: previousValidationErrors?.length ?? 0,
@@ -147,7 +149,8 @@ export async function handleRefineWorkflow(
       allowedTools,
       previousValidationErrors,
       provider,
-      copilotModel
+      copilotModel,
+      qoderModel
     );
 
     // Check if AI is asking for clarification
@@ -316,6 +319,7 @@ async function handleRefineSubAgentFlow(
     timeoutMs,
     subAgentFlowId,
     model = 'sonnet',
+    qoderModel = 'auto',
     allowedTools,
     provider = 'claude-code',
     copilotModel = 'gpt-4o',
@@ -335,6 +339,7 @@ async function handleRefineSubAgentFlow(
     useSkills,
     timeoutMs: effectiveTimeoutMs,
     model,
+    qoderModel,
     allowedTools,
     provider,
     copilotModel,
@@ -414,7 +419,8 @@ async function handleRefineSubAgentFlow(
       model,
       allowedTools,
       provider,
-      copilotModel
+      copilotModel,
+      qoderModel
     );
 
     // Check if AI is asking for clarification

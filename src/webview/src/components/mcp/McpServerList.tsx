@@ -8,7 +8,7 @@
  * Task: T022
  */
 
-import type { McpServerReference } from '@shared/types/messages';
+import type { AiCliProvider, McpServerReference } from '@shared/types/messages';
 import { useEffect, useState } from 'react';
 import { useTranslation } from '../../i18n/i18n-context';
 import { listMcpServers, refreshMcpCache } from '../../services/mcp-service';
@@ -18,12 +18,15 @@ interface McpServerListProps {
   onServerSelect: (server: McpServerReference) => void;
   selectedServerId?: string;
   filterByScope?: ('user' | 'project' | 'enterprise')[];
+  /** AI CLI provider for MCP server discovery */
+  provider?: AiCliProvider;
 }
 
 export function McpServerList({
   onServerSelect,
   selectedServerId,
   filterByScope,
+  provider = 'claude-code',
 }: McpServerListProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -39,6 +42,7 @@ export function McpServerList({
     try {
       const result = await listMcpServers({
         options: filterByScope ? { filterByScope } : undefined,
+        provider,
       });
 
       if (!result.success) {
@@ -59,7 +63,7 @@ export function McpServerList({
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadServers is stable and shouldn't trigger re-renders
   useEffect(() => {
     loadServers();
-  }, [filterByScope, t]);
+  }, [filterByScope, provider, t]);
 
   /**
    * Handle refresh button click
@@ -342,7 +346,7 @@ function getScopeForegroundColor(scope: 'user' | 'project' | 'enterprise'): stri
 /**
  * Get background color for status badge
  */
-function getStatusColor(status: 'connected' | 'disconnected' | 'error'): string {
+function getStatusColor(status: 'connected' | 'disconnected' | 'error' | 'unknown'): string {
   switch (status) {
     case 'connected':
       return '#388a34'; // Success green
@@ -350,6 +354,8 @@ function getStatusColor(status: 'connected' | 'disconnected' | 'error'): string 
       return '#666666'; // Neutral gray
     case 'error':
       return 'var(--vscode-errorForeground)';
+    case 'unknown':
+      return '#888888'; // Lighter gray for unknown
     default:
       return 'var(--vscode-badge-background)';
   }
@@ -358,11 +364,12 @@ function getStatusColor(status: 'connected' | 'disconnected' | 'error'): string 
 /**
  * Get foreground color for status badge
  */
-function getStatusForegroundColor(status: 'connected' | 'disconnected' | 'error'): string {
+function getStatusForegroundColor(status: 'connected' | 'disconnected' | 'error' | 'unknown'): string {
   switch (status) {
     case 'connected':
     case 'disconnected':
     case 'error':
+    case 'unknown':
       return '#ffffff'; // White text for colored backgrounds
     default:
       return 'var(--vscode-badge-foreground)';

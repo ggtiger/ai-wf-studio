@@ -1,15 +1,35 @@
 # Implementation Plan: Claude Code Workflow Studio
 
+# 实现计划：Claude Code Workflow Studio
+
 **Branch**: `001-cc-wf-studio` | **Date**: 2025-11-01 | **Spec**: [spec.md](/Users/se_nishikawa/chore/cc-wf-studio/specs/001-cc-wf-studio/spec.md)
 **Input**: Feature specification from `/specs/001-cc-wf-studio/spec.md` and user requirement: "webviewはReact with typescript で作成してviteでビルドする形で実装したい"
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
+**中文概要：**  
+本文件给出了「Claude Code Workflow Studio」功能的整体实现计划：  
+- 作为 VS Code 扩展，通过可视化编辑器帮助用户设计和管理由 SlashCommands 与 Sub-Agent 组成的工作流  
+- 在画布上以类似 AWS Step Functions 的方式拖拽节点，并最终导出为可在 Claude Code 中直接执行的 `.claude` 配置文件  
+- 明确技术栈（VS Code Extension + React Webview）、存储结构、测试方案、性能目标以及项目结构划分等内容
+
 ## Summary
 
 VSCode拡張機能として、Claude CodeのSlashCommandsとSub-Agentを組み合わせたワークフローをビジュアルエディタで設計・管理するツールを開発する。ユーザーはAWS Step FunctionsのようなUIでノードをドラッグ&ドロップし、実行可能な`.claude`設定ファイル（Sub-Agent設定ファイル、SlashCommand）としてエクスポートできる。
 
+（摘要的中文说明）  
+我们将实现一个 VS Code 扩展，让用户可以在可视化编辑器中设计 Claude Code 工作流：  
+- 使用 SlashCommand + Sub-Agent 组合表达完整流程  
+- 通过类似 AWS Step Functions 的界面拖拽节点构建工作流  
+- 将完成的流程导出为 `.claude` 目录下的可执行配置文件（包括 Sub-Agent 配置以及 SlashCommand 定义）
+
 **技術的アプローチ**: VSCode拡張機能のWebviewをReact + TypeScript + Viteで実装し、ビジュアルエディタの描画にはReact Flowを採用。ワークフロー定義はJSON形式で`.vscode/workflows/`に保存し、エクスポート時に`.claude/agents/`と`.claude/commands/`へMarkdown形式で出力する。
+
+（技术方案的中文说明）  
+技术上采用 VS Code 扩展 + Webview 的典型架构：  
+- Webview 使用 React + TypeScript + Vite 实现，画布组件采用 React Flow  
+- 工作流定义以 JSON 形式保存在 `.vscode/workflows/` 目录  
+- 在导出时，将 JSON 工作流转换为 `.claude/agents/` 与 `.claude/commands/` 下的 Markdown 配置文件，供 Claude Code 实际执行
 
 ## Technical Context
 
@@ -38,6 +58,14 @@ VSCode拡張機能として、Claude CodeのSlashCommandsとSub-Agentを組み�
 - 1ワークフローあたり最大50ノード
 - 複数ワークフローの同時管理
 - 2種類のノードタイプ（Sub-Agent、AskUserQuestion）
+
+（技术背景的中文说明）  
+这一节总结了实现该扩展所需的技术环境与约束：  
+- 后端运行在 VS Code Extension Host 上，使用 TypeScript 开发；前端 Webview 使用 React 18 + Vite  
+- 本地文件系统作为唯一存储介质，分别保存工作流定义（`.vscode/workflows/*.json`）以及导出的 `.claude/agents/*.md`、`.claude/commands/*.md`  
+- 使用 Biome 作为统一的格式化与 Lint 工具，测试覆盖 Extension、Webview 以及端到端 E2E 场景  
+- 性能目标包括：工作流读取时间 < 1 秒（10KB 以内）、50 个节点内保持流畅交互、UI 响应时间 < 500ms  
+- 仅支持本地环境，单个工作流最大 50 个节点，主要节点类型为 Sub-Agent 与 AskUserQuestion
 
 ## Constitution Check
 
@@ -107,6 +135,15 @@ VSCode拡張機能として、Claude CodeのSlashCommandsとSub-Agentを組み�
   - VSCode拡張機能のpackage.jsonでバージョン管理
 
 **違反の正当化**: なし（すべての原則を満たす設計）
+
+（宪章检查的中文说明）  
+本节按「代码质量、TDD、UX 一致性、性能基准、可维护性与扩展性」五个维度，对计划中的实现是否符合团队宪章进行逐项核对：  
+- 通过 TypeScript 强类型、清晰的命名与文件结构来保证可读性与复杂度可控  
+- 以用户故事 → 测试用例 → 实现的顺序推进，覆盖单元测试、集成测试与契约测试  
+- UI 设计遵循 VS Code 官方组件与 AWS Step Functions 风格，并重视可访问性与错误提示的清晰度  
+- 性能方面聚焦在 Webview 加载时间与交互响应时间，而非远端 API 或数据库  
+- 采用模块化拆分 Extension Host / Webview / 领域逻辑，配合工作区配置与语义化版本规范，确保后期维护与扩展的成本可控  
+整体来看，本计划在宪章要求上没有刻意让步或违反项。
 
 ## Project Structure
 

@@ -23,6 +23,7 @@ import type { Node } from 'reactflow';
 import { getNodeTypeLabel } from '../constants/node-type-labels';
 import { useResizablePanel } from '../hooks/useResizablePanel';
 import { useTranslation } from '../i18n/i18n-context';
+import { useRefinementStore } from '../stores/refinement-store';
 import { useWorkflowStore } from '../stores/workflow-store';
 import type { PromptNodeData } from '../types/node-types';
 import { extractVariables } from '../utils/template-utils';
@@ -57,6 +58,7 @@ export const PropertyOverlay: React.FC<PropertyOverlayProps> = ({
     closePropertyOverlay,
     subAgentFlows,
   } = useWorkflowStore();
+  const { selectedProvider } = useRefinementStore();
   const { width, handleMouseDown } = useResizablePanel();
 
   // Use override if provided, otherwise use store value
@@ -253,6 +255,7 @@ export const PropertyOverlay: React.FC<PropertyOverlayProps> = ({
             <SubAgentProperties
               node={selectedNode as Node<SubAgentData>}
               updateNodeData={updateNodeData}
+              selectedProvider={selectedProvider}
             />
           ) : selectedNode.type === 'askUserQuestion' ? (
             <AskUserQuestionProperties
@@ -293,6 +296,7 @@ export const PropertyOverlay: React.FC<PropertyOverlayProps> = ({
             <SubAgentFlowProperties
               node={selectedNode as Node<SubAgentFlowNodeData>}
               updateNodeData={updateNodeData}
+              selectedProvider={selectedProvider}
             />
           ) : selectedNode.type === 'start' || selectedNode.type === 'end' ? (
             <div
@@ -335,7 +339,8 @@ export const PropertyOverlay: React.FC<PropertyOverlayProps> = ({
 const SubAgentProperties: React.FC<{
   node: Node<SubAgentData>;
   updateNodeData: (nodeId: string, data: Partial<unknown>) => void;
-}> = ({ node, updateNodeData }) => {
+  selectedProvider: string;
+}> = ({ node, updateNodeData, selectedProvider }) => {
   const { t } = useTranslation();
   const data = node.data;
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
@@ -442,10 +447,10 @@ const SubAgentProperties: React.FC<{
         </label>
         <select
           id="model-select"
-          value={data.model || 'sonnet'}
+          value={data.model || (selectedProvider === 'qoder' ? 'auto' : 'sonnet')}
           onChange={(e) =>
             updateNodeData(node.id, {
-              model: e.target.value as 'sonnet' | 'opus' | 'haiku' | 'inherit',
+              model: e.target.value,
             })
           }
           className="nodrag"
@@ -459,10 +464,23 @@ const SubAgentProperties: React.FC<{
             fontSize: '13px',
           }}
         >
-          <option value="sonnet">Sonnet</option>
-          <option value="opus">Opus</option>
-          <option value="haiku">Haiku</option>
-          <option value="inherit">Inherit</option>
+          {selectedProvider === 'qoder' ? (
+            <>
+              <option value="auto">Auto</option>
+              <option value="efficient">Efficient</option>
+              <option value="lite">Lite</option>
+              <option value="performance">Performance</option>
+              <option value="ultimate">Ultimate</option>
+              <option value="inherit">Inherit</option>
+            </>
+          ) : (
+            <>
+              <option value="sonnet">Sonnet</option>
+              <option value="opus">Opus</option>
+              <option value="haiku">Haiku</option>
+              <option value="inherit">Inherit</option>
+            </>
+          )}
         </select>
       </div>
 
@@ -2418,7 +2436,8 @@ const McpProperties: React.FC<{
 const SubAgentFlowProperties: React.FC<{
   node: Node<SubAgentFlowNodeData>;
   updateNodeData: (nodeId: string, data: Partial<unknown>) => void;
-}> = ({ node, updateNodeData }) => {
+  selectedProvider: string;
+}> = ({ node, updateNodeData, selectedProvider }) => {
   const { t } = useTranslation();
   const { subAgentFlows, setActiveSubAgentFlowId } = useWorkflowStore();
   const data = node.data;
@@ -2514,10 +2533,10 @@ const SubAgentFlowProperties: React.FC<{
         </label>
         <select
           id="subagentflow-model-select"
-          value={data.model || 'sonnet'}
+          value={data.model || (selectedProvider === 'qoder' ? 'auto' : 'sonnet')}
           onChange={(e) =>
             updateNodeData(node.id, {
-              model: e.target.value as 'sonnet' | 'opus' | 'haiku' | 'inherit',
+              model: e.target.value,
             })
           }
           className="nodrag"
@@ -2531,10 +2550,23 @@ const SubAgentFlowProperties: React.FC<{
             fontSize: '13px',
           }}
         >
-          <option value="sonnet">Sonnet</option>
-          <option value="opus">Opus</option>
-          <option value="haiku">Haiku</option>
-          <option value="inherit">Inherit</option>
+          {selectedProvider === 'qoder' ? (
+            <>
+              <option value="auto">Auto</option>
+              <option value="efficient">Efficient</option>
+              <option value="lite">Lite</option>
+              <option value="performance">Performance</option>
+              <option value="ultimate">Ultimate</option>
+              <option value="inherit">Inherit</option>
+            </>
+          ) : (
+            <>
+              <option value="sonnet">Sonnet</option>
+              <option value="opus">Opus</option>
+              <option value="haiku">Haiku</option>
+              <option value="inherit">Inherit</option>
+            </>
+          )}
         </select>
       </div>
 

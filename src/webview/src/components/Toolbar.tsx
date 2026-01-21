@@ -39,6 +39,7 @@ import {
   CopilotExecutionModeDropdown,
 } from './toolbar/CopilotExecutionModeDropdown';
 import { MoreActionsDropdown } from './toolbar/MoreActionsDropdown';
+import { ProviderSelectorDropdown } from './toolbar/ProviderSelectorDropdown';
 import { SlashCommandOptionsDropdown } from './toolbar/SlashCommandOptionsDropdown';
 
 interface ToolbarProps {
@@ -94,6 +95,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     loadConversationHistory,
     isCopilotEnabled,
     toggleCopilotEnabled,
+    selectedProvider,
+    setSelectedProvider,
+    selectedQoderModel,
   } = useRefinementStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -380,8 +384,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       // Validate workflow before run
       validateWorkflow(workflow);
 
-      // Run as slash command
-      await runAsSlashCommand(workflow);
+      // Run as slash command with selected provider
+      await runAsSlashCommand(workflow, selectedProvider);
       console.log('Workflow run as slash command:', workflowName);
     } catch (error) {
       // Translate error messages
@@ -543,7 +547,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         workflowJson,
         targetLanguage,
         30000,
-        currentRequestId
+        currentRequestId,
+        selectedProvider,
+        selectedQoderModel
       );
 
       // Only update if not cancelled
@@ -869,6 +875,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       )}
                     </button>
                   </div>
+                  <ProviderSelectorDropdown
+                    provider={selectedProvider}
+                    onProviderChange={setSelectedProvider}
+                    disabled={isRunning || isExporting}
+                  />
                   <SlashCommandOptionsDropdown
                     context={slashCommandOptions.context ?? 'default'}
                     onContextChange={setSlashCommandContext}
@@ -884,6 +895,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     onDisableModelInvocationChange={setSlashCommandDisableModelInvocation}
                     argumentHint={slashCommandOptions.argumentHint ?? ''}
                     onArgumentHintChange={setSlashCommandArgumentHint}
+                    provider={selectedProvider}
                   />
                 </div>
               </div>
@@ -1069,6 +1081,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   )}
                 </button>
               </div>
+              <ProviderSelectorDropdown
+                provider={selectedProvider}
+                onProviderChange={setSelectedProvider}
+                disabled={isRunning || isExporting}
+              />
               <SlashCommandOptionsDropdown
                 context={slashCommandOptions.context ?? 'default'}
                 onContextChange={setSlashCommandContext}
@@ -1084,6 +1101,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 onDisableModelInvocationChange={setSlashCommandDisableModelInvocation}
                 argumentHint={slashCommandOptions.argumentHint ?? ''}
                 onArgumentHintChange={setSlashCommandArgumentHint}
+                provider={selectedProvider}
               />
             </div>
           </div>

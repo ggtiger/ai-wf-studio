@@ -12,6 +12,7 @@ import type React from 'react';
 import { useState } from 'react';
 import { useIsCompactMode } from '../hooks/useWindowWidth';
 import { useTranslation } from '../i18n/i18n-context';
+import { useRefinementStore } from '../stores/refinement-store';
 import { useWorkflowStore } from '../stores/workflow-store';
 import { McpNodeDialog } from './dialogs/McpNodeDialog';
 import { SkillBrowserDialog } from './dialogs/SkillBrowserDialog';
@@ -41,6 +42,10 @@ export const NodePalette: React.FC<NodePaletteProps> = ({ onCollapse }) => {
     setActiveSubAgentFlowId,
     activeSubAgentFlowId,
   } = useWorkflowStore();
+  const { selectedProvider } = useRefinementStore();
+
+  // Get default model based on provider
+  const defaultModel = selectedProvider === 'qoder' ? 'auto' : 'sonnet';
 
   // サブエージェントフロー編集中はネスト不可のノードを非活性にする
   const isEditingSubAgentFlow = activeSubAgentFlowId !== null;
@@ -95,7 +100,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({ onCollapse }) => {
       data: {
         description: t('default.newSubAgent'),
         prompt: t('default.enterPrompt'),
-        model: 'sonnet' as const,
+        model: defaultModel,
         outputPorts: 1,
       },
     };

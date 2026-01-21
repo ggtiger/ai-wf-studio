@@ -10,6 +10,7 @@ import type {
   ClaudeModel,
   CopilotModel,
   ExtensionMessage,
+  QoderModel,
   RefinementClarificationPayload,
   RefinementProgressPayload,
   RefinementSuccessPayload,
@@ -110,7 +111,8 @@ export function refineWorkflow(
   allowedTools?: string[],
   previousValidationErrors?: ValidationErrorInfo[],
   provider: AiCliProvider = 'claude-code',
-  copilotModel: CopilotModel = 'gpt-4o'
+  copilotModel: CopilotModel = 'gpt-4o',
+  qoderModel: QoderModel = 'auto'
 ): Promise<RefinementResult> {
   return new Promise((resolve, reject) => {
     // Register response handler
@@ -165,6 +167,7 @@ export function refineWorkflow(
       useSkills,
       timeoutMs: serverTimeoutMs, // Pass timeout to server (undefined = use settings)
       model,
+      qoderModel,
       allowedTools,
       previousValidationErrors,
       provider,
@@ -259,6 +262,7 @@ export function cancelWorkflowRefinement(requestId: string): void {
  * @param allowedTools - Optional array of allowed tool names
  * @param provider - AI CLI provider to use (default: 'claude-code')
  * @param copilotModel - Copilot model to use when provider is 'copilot' (default: 'gpt-4o')
+ * @param qoderModel - Qoder model to use when provider is 'qoder' (default: 'auto')
  * @returns Promise that resolves to the refinement result (success or clarification)
  * @throws {WorkflowRefinementError} If refinement fails
  */
@@ -274,7 +278,8 @@ export function refineSubAgentFlow(
   model: ClaudeModel = 'sonnet',
   allowedTools?: string[],
   provider: AiCliProvider = 'claude-code',
-  copilotModel: CopilotModel = 'gpt-4o'
+  copilotModel: CopilotModel = 'gpt-4o',
+  qoderModel: QoderModel = 'auto'
 ): Promise<SubAgentFlowRefinementResult> {
   return new Promise((resolve, reject) => {
     // Register response handler
@@ -324,6 +329,7 @@ export function refineSubAgentFlow(
       targetType: 'subAgentFlow',
       subAgentFlowId,
       model,
+      qoderModel,
       allowedTools,
       provider,
       copilotModel,

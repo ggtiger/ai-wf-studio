@@ -92,7 +92,7 @@ export const zhCNWebviewTranslations: WebviewTranslationKeys = {
   // Copilot Execution Mode
   'copilot.mode.tooltip': '选择 Copilot 执行模式',
   'copilot.mode.cli': 'Copilot CLI',
-  'copilot.mode.vscode': 'VSCode Copilot',
+  'copilot.mode.vscode': 'VS Code / Trae / Qoder / Cursor',
 
   // Node Palette
   'palette.title': '节点面板',
