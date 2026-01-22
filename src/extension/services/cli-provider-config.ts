@@ -5,12 +5,14 @@
  * Each provider may have different command-line argument formats.
  */
 
-import nanoSpawn from 'nano-spawn';
 import * as vscode from 'vscode';
 import type { AiCliProvider, ClaudeModel, QoderModel } from '../../shared/types/messages';
 import { log } from '../extension';
 import { getCliPath } from './claude-cli-path';
 
+/**
+ * nano-spawn type definitions (manually defined for compatibility)
+ */
 interface Result {
   stdout: string;
   stderr: string;
@@ -19,13 +21,20 @@ interface Result {
   durationMs: number;
 }
 
-const spawn =
-  nanoSpawn.default ||
-  (nanoSpawn as (
-    file: string,
-    args?: readonly string[],
-    options?: Record<string, unknown>
-  ) => Promise<Result>);
+type NanoSpawn = (
+  file: string,
+  args?: readonly string[],
+  options?: Record<string, unknown>
+) => Promise<Result>;
+
+let nanoSpawnPromise: Promise<NanoSpawn> | null = null;
+
+async function getNanoSpawn(): Promise<NanoSpawn> {
+  if (!nanoSpawnPromise) {
+    nanoSpawnPromise = import('nano-spawn').then((mod) => (mod.default ?? mod) as NanoSpawn);
+  }
+  return nanoSpawnPromise;
+}
 
 /**
  * CLI Provider configuration interface
@@ -341,6 +350,24 @@ let cachedProvider: AiCliProvider | null = null;
 export async function initializeProviderDetection(): Promise<void> {
   cachedProvider = await detectCurrentProvider();
   log('INFO', 'Provider detection initialized', { provider: cachedProvider });
+
+  // Pre-load models for all available providers
+  const providers: AiCliProvider[] = ['claude-code', 'qoder', 'trae'];
+  await Promise.all(
+    providers.map(async (provider) => {
+      try {
+        const models = await detectProviderModels(provider);
+        if (models.length > 0) {
+          log('INFO', `Models detected for ${provider}`, {
+            count: models.length,
+            models: models.map((m) => m.id),
+          });
+        }
+      } catch (error) {
+        log('WARN', `Failed to detect models for ${provider}`, { error });
+      }
+    })
+  );
 }
 
 /**
@@ -527,14 +554,67 @@ export async function detectProviderModels(provider: AiCliProvider): Promise<Cli
 }
 
 /**
- * Try to detect models from CLI help output
+ * Try to detect models from CLI help output or dedicated commands
  */
 async function tryDetectModelsFromCli(
   cliPath: string,
   provider: AiCliProvider
 ): Promise<CliModelInfo[]> {
   try {
-    // Try --help to see if it contains model information
+    // For Claude Code and Trae: these CLIs don't have a 'models' command
+    // They use hardcoded model aliases (sonnet, opus, haiku) that map to the latest versions
+    // We'll use the default models from config instead of trying to detect them
+    if (provider === 'claude-code' || provider === 'trae') {
+      log('INFO', `Using default models for ${provider} (CLI does not support model listing)`);
+      return []; // Return empty to use default models from config
+    }
+
+    // For Qoder, try 'qodercli --help' and parse model information
+    if (provider === 'qoder') {
+      try {
+        const spawn = await getNanoSpawn();
+        const result = await spawn(cliPath, ['--help'], { timeout: 5000 });
+        const output = result.stdout + result.stderr;
+
+        // Parse Qoder model list from help output
+        const models: CliModelInfo[] = [];
+        const lines = output.split('\n');
+
+        for (const line of lines) {
+          const trimmed = line.trim().toLowerCase();
+          // Look for Qoder model names
+          if (trimmed.includes('auto') && !models.find((m) => m.id === 'auto')) {
+            models.push({ id: 'auto', name: 'Auto', available: true });
+          }
+          if (trimmed.includes('efficient') && !models.find((m) => m.id === 'efficient')) {
+            models.push({ id: 'efficient', name: 'Efficient', available: true });
+          }
+          if (trimmed.includes('lite') && !models.find((m) => m.id === 'lite')) {
+            models.push({ id: 'lite', name: 'Lite', available: true });
+          }
+          if (trimmed.includes('performance') && !models.find((m) => m.id === 'performance')) {
+            models.push({ id: 'performance', name: 'Performance', available: true });
+          }
+          if (trimmed.includes('ultimate') && !models.find((m) => m.id === 'ultimate')) {
+            models.push({ id: 'ultimate', name: 'Ultimate', available: true });
+          }
+        }
+
+        if (models.length > 0) {
+          log('INFO', `Detected models from ${provider} CLI`, {
+            models: models.map((m) => m.id),
+          });
+          return models;
+        }
+      } catch (error) {
+        log('INFO', `Could not parse models from ${provider} --help`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Generic fallback: try --help to see if it contains model information
+    const spawn = await getNanoSpawn();
     const result = await spawn(cliPath, ['--help'], { timeout: 5000 });
     const output = result.stdout + result.stderr;
 
@@ -542,9 +622,9 @@ async function tryDetectModelsFromCli(
     // This is a best-effort detection - different CLIs may have different formats
     const modelMatch = output.match(/models?[:\s]+(\w+(?:[,\s]+\w+)*)/i);
     if (modelMatch) {
-      const models = modelMatch[1].split(/[,\s]+/).filter((m) => m.length > 0);
+      const models = modelMatch[1].split(/[,\s]+/).filter((m: string) => m.length > 0);
       log('INFO', `Detected models from ${provider} CLI help`, { models });
-      return models.map((model) => ({
+      return models.map((model: string) => ({
         id: model.toLowerCase(),
         name: model.charAt(0).toUpperCase() + model.slice(1).toLowerCase(),
         available: true,

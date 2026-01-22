@@ -78,9 +78,23 @@ export async function handleGenerateWorkflowName(
         executionTimeMs,
       });
 
+      // Map error codes to the expected type
+      // MODEL_NOT_SUPPORTED and COPILOT_NOT_AVAILABLE are mapped to UNKNOWN_ERROR
+      // Note: CANCELLED is not a valid ClaudeCodeExecutionResult error code
+      const errorCode = result.error?.code;
+      const mappedErrorCode:
+        | 'COMMAND_NOT_FOUND'
+        | 'TIMEOUT'
+        | 'PARSE_ERROR'
+        | 'CANCELLED'
+        | 'UNKNOWN_ERROR' =
+        errorCode === 'COMMAND_NOT_FOUND' || errorCode === 'TIMEOUT' || errorCode === 'PARSE_ERROR'
+          ? errorCode
+          : 'UNKNOWN_ERROR';
+
       sendNameFailed(webview, requestId, {
         error: {
-          code: result.error?.code ?? 'UNKNOWN_ERROR',
+          code: mappedErrorCode,
           message: result.error?.message ?? 'Failed to generate name',
           details: result.error?.details,
         },
