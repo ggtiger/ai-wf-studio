@@ -280,13 +280,29 @@ export type ClaudeModel = 'sonnet' | 'opus' | 'haiku';
 export type QoderModel = 'auto' | 'efficient' | 'lite' | 'performance' | 'ultimate';
 
 /**
+ * Qwen model selection (maps to --model flag)
+ * Model names are dynamically discovered from CLI.
+ * Common models include qwen variations.
+ */
+export type QwenModel = string;
+
+/**
+ * OpenCode model selection (maps to -m flag in format provider/model)
+ * Model names are dynamically discovered from CLI.
+ * Example: "anthropic/claude-sonnet-4-20250514"
+ */
+export type OpenCodeModel = string;
+
+/**
  * AI CLI provider selection
  * - claude-code: Claude Code CLI (default)
  * - copilot: VS Code Language Model API (Copilot)
  * - qoder: Qoder CLI
  * - trae: Trae CLI
+ * - qwen: Qwen CLI
+ * - opencode: OpenCode CLI
  */
-export type AiCliProvider = 'claude-code' | 'copilot' | 'qoder' | 'trae';
+export type AiCliProvider = 'claude-code' | 'copilot' | 'qoder' | 'trae' | 'qwen' | 'opencode';
 
 /**
  * Copilot model selection (for VS Code Language Model API)
@@ -322,6 +338,30 @@ export interface CopilotModelsListPayload {
 }
 
 /**
+ * Information about an OpenCode model available via CLI
+ */
+export interface OpenCodeModelInfo {
+  /** Model ID (e.g., 'openrouter/anthropic/claude-sonnet-4') */
+  id: string;
+  /** Display name (e.g., 'anthropic/claude-sonnet-4') */
+  name: string;
+  /** Whether the model is available */
+  available: boolean;
+}
+
+/**
+ * Payload for listing available OpenCode models
+ */
+export interface OpenCodeModelsListPayload {
+  /** List of available OpenCode models */
+  models: OpenCodeModelInfo[];
+  /** Whether the CLI is available */
+  available: boolean;
+  /** Error reason if not available */
+  unavailableReason?: string;
+}
+
+/**
  * AI settings from VSCode configuration
  */
 export interface AiSettingsPayload {
@@ -331,6 +371,10 @@ export interface AiSettingsPayload {
   defaultModel: ClaudeModel;
   /** Default Qoder model from settings */
   defaultQoderModel: QoderModel;
+  /** Default Qwen model from settings */
+  defaultQwenModel: QwenModel;
+  /** Default OpenCode model from settings */
+  defaultOpenCodeModel: OpenCodeModel;
 }
 
 export interface RefineWorkflowPayload {
@@ -354,6 +398,10 @@ export interface RefineWorkflowPayload {
   model?: ClaudeModel;
   /** Qoder model to use when provider is 'qoder' (default: 'auto') */
   qoderModel?: QoderModel;
+  /** Qwen model to use when provider is 'qwen' (optional, uses CLI default if not specified) */
+  qwenModel?: QwenModel;
+  /** OpenCode model to use when provider is 'opencode' (optional, format: provider/model) */
+  openCodeModel?: OpenCodeModel;
   /** Allowed tools for Claude Code CLI (optional, e.g., ['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch']) */
   allowedTools?: string[];
   /** Previous validation errors from failed refinement attempt (for retry with error context) */
@@ -761,6 +809,7 @@ export type ExtensionMessage =
   | Message<SlackErrorPayload, 'SEARCH_SLACK_WORKFLOWS_FAILED'>
   | Message<SlackOAuthInitiatedPayload, 'SLACK_OAUTH_INITIATED'>
   | Message<CopilotModelsListPayload, 'COPILOT_MODELS_LIST'>
+  | Message<OpenCodeModelsListPayload, 'OPENCODE_MODELS_LIST'>
   | Message<AiSettingsPayload, 'AI_SETTINGS'>
   | Message<SlackOAuthSuccessPayload, 'SLACK_OAUTH_SUCCESS'>
   | Message<SlackErrorPayload, 'SLACK_OAUTH_FAILED'>
@@ -844,8 +893,14 @@ export interface GenerateWorkflowNamePayload {
   timeoutMs?: number;
   /** AI CLI provider (default: 'claude-code') */
   provider?: AiCliProvider;
+  /** Claude model to use when provider is 'claude-code' (default: 'haiku') */
+  model?: ClaudeModel;
   /** Qoder model to use when provider is 'qoder' (default: 'efficient') */
   qoderModel?: QoderModel;
+  /** Qwen model to use when provider is 'qwen' (optional) */
+  qwenModel?: QwenModel;
+  /** OpenCode model to use when provider is 'opencode' (optional, format: provider/model) */
+  openCodeModel?: OpenCodeModel;
 }
 
 /**

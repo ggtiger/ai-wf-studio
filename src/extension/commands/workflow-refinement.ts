@@ -58,6 +58,7 @@ export async function handleRefineWorkflow(
     previousValidationErrors,
     provider = 'claude-code',
     copilotModel = 'gpt-4o',
+    openCodeModel = '',
   } = payload;
   const startTime = Date.now();
 
@@ -81,6 +82,7 @@ export async function handleRefineWorkflow(
     previousErrorCount: previousValidationErrors?.length ?? 0,
     provider,
     copilotModel,
+    openCodeModel,
   });
 
   // Route to SubAgentFlow refinement if targetType is 'subAgentFlow'
@@ -150,7 +152,8 @@ export async function handleRefineWorkflow(
       previousValidationErrors,
       provider,
       copilotModel,
-      qoderModel
+      qoderModel,
+      openCodeModel
     );
 
     // Check if AI is asking for clarification

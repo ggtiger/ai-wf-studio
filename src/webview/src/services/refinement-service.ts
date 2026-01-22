@@ -95,6 +95,8 @@ export type RefinementProgressCallback = (payload: RefinementProgressPayload) =>
  * @param previousValidationErrors - Validation errors from previous failed attempt (for retry)
  * @param provider - AI CLI provider to use (default: 'claude-code')
  * @param copilotModel - Copilot model to use when provider is 'copilot' (default: 'gpt-4o')
+ * @param qoderModel - Qoder model to use when provider is 'qoder' (default: 'auto')
+ * @param openCodeModel - OpenCode model to use when provider is 'opencode' (optional)
  * @returns Promise that resolves to the refinement result (success or clarification)
  * @throws {WorkflowRefinementError} If refinement fails
  */
@@ -112,7 +114,8 @@ export function refineWorkflow(
   previousValidationErrors?: ValidationErrorInfo[],
   provider: AiCliProvider = 'claude-code',
   copilotModel: CopilotModel = 'gpt-4o',
-  qoderModel: QoderModel = 'auto'
+  qoderModel: QoderModel = 'auto',
+  openCodeModel?: string
 ): Promise<RefinementResult> {
   return new Promise((resolve, reject) => {
     // Register response handler
@@ -172,6 +175,7 @@ export function refineWorkflow(
       previousValidationErrors,
       provider,
       copilotModel,
+      openCodeModel,
     };
 
     vscode.postMessage({
@@ -263,6 +267,7 @@ export function cancelWorkflowRefinement(requestId: string): void {
  * @param provider - AI CLI provider to use (default: 'claude-code')
  * @param copilotModel - Copilot model to use when provider is 'copilot' (default: 'gpt-4o')
  * @param qoderModel - Qoder model to use when provider is 'qoder' (default: 'auto')
+ * @param openCodeModel - OpenCode model to use when provider is 'opencode' (optional)
  * @returns Promise that resolves to the refinement result (success or clarification)
  * @throws {WorkflowRefinementError} If refinement fails
  */
@@ -279,7 +284,8 @@ export function refineSubAgentFlow(
   allowedTools?: string[],
   provider: AiCliProvider = 'claude-code',
   copilotModel: CopilotModel = 'gpt-4o',
-  qoderModel: QoderModel = 'auto'
+  qoderModel: QoderModel = 'auto',
+  openCodeModel?: string
 ): Promise<SubAgentFlowRefinementResult> {
   return new Promise((resolve, reject) => {
     // Register response handler
@@ -333,6 +339,7 @@ export function refineSubAgentFlow(
       allowedTools,
       provider,
       copilotModel,
+      openCodeModel,
     };
 
     vscode.postMessage({
@@ -402,5 +409,55 @@ export function listCopilotModels(): Promise<CopilotModelsResult> {
         unavailableReason: 'Request timed out',
       });
     }, 5000);
+  });
+}
+
+/**
+ * Result type for OpenCode models listing
+ */
+export interface OpenCodeModelsResult {
+  models: Array<{
+    id: string;
+    name: string;
+    available: boolean;
+  }>;
+  available: boolean;
+  unavailableReason?: string;
+}
+
+/**
+ * List available OpenCode models from CLI
+ *
+ * @returns Promise that resolves to the list of available models
+ */
+export function listOpenCodeModels(): Promise<OpenCodeModelsResult> {
+  return new Promise((resolve) => {
+    const requestId = `list-opencode-models-${Date.now()}-${Math.random()}`;
+
+    const handler = (event: MessageEvent) => {
+      const message: ExtensionMessage = event.data;
+
+      if (message.requestId === requestId && message.type === 'OPENCODE_MODELS_LIST') {
+        window.removeEventListener('message', handler);
+        resolve(message.payload as OpenCodeModelsResult);
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    vscode.postMessage({
+      type: 'LIST_OPENCODE_MODELS',
+      requestId,
+    });
+
+    // Timeout after 10 seconds (CLI detection may take longer)
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      resolve({
+        models: [],
+        available: false,
+        unavailableReason: 'Request timed out',
+      });
+    }, 10000);
   });
 }

@@ -346,12 +346,49 @@ export function registerOpenEditorCommand(
               }
               break;
 
+            case 'LIST_OPENCODE_MODELS':
+              // List available OpenCode models from CLI
+              {
+                const { detectProviderModels } = await import('../services/cli-provider-config');
+                try {
+                  const models = await detectProviderModels('opencode');
+                  webview.postMessage({
+                    type: 'OPENCODE_MODELS_LIST',
+                    requestId: message.requestId,
+                    payload: {
+                      models: models.map((m) => ({
+                        id: m.id,
+                        name: m.name,
+                        available: m.available ?? true,
+                      })),
+                      available: models.length > 0,
+                    },
+                  });
+                } catch (error) {
+                  webview.postMessage({
+                    type: 'OPENCODE_MODELS_LIST',
+                    requestId: message.requestId,
+                    payload: {
+                      models: [],
+                      available: false,
+                      unavailableReason:
+                        error instanceof Error ? error.message : 'Failed to fetch OpenCode models',
+                    },
+                  });
+                }
+              }
+              break;
+
             case 'GET_AI_SETTINGS':
               // Get AI settings from VSCode configuration
               {
-                const { getDefaultProvider, getDefaultModel, getDefaultQoderModel } = await import(
-                  '../services/cli-provider-config'
-                );
+                const {
+                  getDefaultProvider,
+                  getDefaultModel,
+                  getDefaultQoderModel,
+                  getDefaultQwenModel,
+                  getDefaultOpenCodeModel,
+                } = await import('../services/cli-provider-config');
                 webview.postMessage({
                   type: 'AI_SETTINGS',
                   requestId: message.requestId,
@@ -359,6 +396,8 @@ export function registerOpenEditorCommand(
                     defaultProvider: getDefaultProvider(),
                     defaultModel: getDefaultModel(),
                     defaultQoderModel: getDefaultQoderModel(),
+                    defaultQwenModel: getDefaultQwenModel(),
+                    defaultOpenCodeModel: getDefaultOpenCodeModel(),
                   },
                 });
               }

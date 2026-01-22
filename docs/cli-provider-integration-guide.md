@@ -1,6 +1,48 @@
 # CLI Provider Integration Guide
 
-This document provides a step-by-step guide for integrating a new CLI provider (like Qoder, Trae, etc.) into cc-wf-studio. Use this as a template when adding support for new AI CLI tools.
+This document provides a step-by-step guide for integrating a new CLI provider (like Qoder, Trae, Qwen, etc.) into cc-wf-studio. Use this as a template when adding support for new AI CLI tools.
+
+## Quick Reference Checklist (MUST DO ALL)
+
+When adding a new CLI provider (e.g., `newprovider`), modify these files in order:
+
+### Step 1: Type Definitions
+| File | Changes |
+|------|---------|
+| `src/shared/types/messages.ts` | 1. Add `NewProviderModel` type<br>2. Add `'newprovider'` to `AiCliProvider`<br>3. Add `defaultNewProviderModel` to `AiSettingsPayload`<br>4. Add `newProviderModel?` to `RefineWorkflowPayload`<br>5. Add `newProviderModel?` to `GenerateWorkflowNamePayload` |
+
+### Step 2: Extension Host - CLI Configuration
+| File | Changes |
+|------|---------|
+| `src/extension/services/cli-provider-config.ts` | 1. Import `NewProviderModel` type<br>2. Add `newProviderConfig` object with CLI args<br>3. Add to `providerConfigs` map<br>4. Add `'newprovider'` to `isValidProvider()`<br>5. Add to `detectCurrentProvider()` app name checks<br>6. Add to `detectCurrentProvider()` environment checks<br>7. Add to `detectCurrentProvider()` CLI availability check<br>8. Add to `getDefaultProvider()` app name checks<br>9. Add `getDefaultNewProviderModel()` function<br>10. Update `getEffectiveModel()` to handle new provider<br>11. Add to providers array in `initializeProviderDetection()`<br>12. Add to `getConfigDirectory()` if uses custom dir<br>13. Add to `getCliDirectory()` if uses custom dir |
+
+### Step 3: Extension Host - Commands
+| File | Changes |
+|------|---------|
+| `src/extension/commands/open-editor.ts` | 1. Import `getDefaultNewProviderModel`<br>2. Add `defaultNewProviderModel` to `GET_AI_SETTINGS` response |
+
+### Step 4: Webview - Services
+| File | Changes |
+|------|---------|
+| `src/webview/src/services/vscode-bridge.ts` | 1. Add `defaultNewProviderModel` to timeout fallback in `getAiSettings()` |
+
+### Step 5: Webview - State Store
+| File | Changes |
+|------|---------|
+| `src/webview/src/stores/refinement-store.ts` | 1. Add `'newprovider'` to `loadProviderFromStorage()` validation |
+
+### Step 6: Webview - UI Components
+| File | Changes |
+|------|---------|
+| `src/webview/src/components/chat/SettingsDropdown.tsx` | 1. Add `{ value: 'newprovider', label: 'NewProvider' }` to `PROVIDER_PRESETS` |
+| `src/webview/src/components/toolbar/ProviderSelectorDropdown.tsx` | 1. Add `{ value: 'newprovider', label: 'NewProvider' }` to `PROVIDER_OPTIONS` |
+
+### Step 7: Build & Verify
+```bash
+npm run format && npm run lint && npm run check && npm run build
+```
+
+---
 
 ## Overview
 
@@ -9,6 +51,17 @@ The extension supports multiple AI CLI providers through a provider abstraction 
 - CLI argument format
 - Model options
 - MCP command support
+
+## Supported Providers
+
+| Provider | Executable | Models | Notes |
+|----------|------------|--------|-------|
+| Claude Code | `claude` | sonnet, opus, haiku | Default provider |
+| Qoder | `qodercli` | auto, efficient, lite, performance, ultimate | Requires `-w` flag |
+| Trae | `trae` | sonnet, opus, haiku | Claude-compatible |
+| Qwen | `qwen` | Dynamic (via `-m` flag) | Claude-like arguments |
+| OpenCode | `opencode` | Dynamic (format: provider/model) | Uses `opencode run` |
+| Copilot | VS Code LM API | Dynamic | Not a CLI |
 
 ## Architecture
 
@@ -387,6 +440,57 @@ Key differences from Claude:
 
 ---
 
+## Example: Qwen Integration Reference
+
+Qwen CLI uses arguments similar to Claude Code CLI:
+
+1. **Type definitions:** Added `QwenModel` type (string, dynamically discovered)
+2. **CLI config:** Added `qwenConfig` with Claude-like arguments
+3. **Store:** Added `selectedQwenModel` state
+4. **Services:** Updated `getEffectiveModel()` to handle Qwen
+
+Key Qwen CLI arguments:
+- `-p, --prompt` - Prompt input (deprecated, use positional)
+- `-m, --model` - Model selection (optional, uses CLI default if not specified)
+- `-o, --output-format` - Output format (text, json, stream-json)
+- `-r, --resume` - Resume specific session by ID
+- `-c, --continue` - Resume most recent session
+- `--allowed-tools` - Tools to allow, bypasses confirmation
+- `--approval-mode` - Set approval mode (plan, default, auto-edit, yolo)
+
+Key differences from Claude:
+- Qwen uses `.qwen` directory for configuration
+- Qwen models are dynamic (not hardcoded like Claude's sonnet/opus/haiku)
+- Qwen CLI has no `--verbose` flag
+
+---
+
+## Example: OpenCode Integration Reference
+
+OpenCode CLI uses `opencode run` for non-interactive execution:
+
+1. **Type definitions:** Added `OpenCodeModel` type (string, format: provider/model)
+2. **CLI config:** Added `openCodeConfig` with `opencode run` command
+3. **Store:** Updated provider validation to include 'opencode'
+4. **Services:** Updated `getEffectiveModel()` to handle OpenCode
+
+Key OpenCode CLI arguments:
+- `opencode run [message..]` - Run with a message
+- `-m, --model` - Model selection (format: provider/model, e.g., "anthropic/claude-sonnet-4")
+- `-s, --session` - Resume specific session by ID
+- `-c, --continue` - Continue last session
+- `--format json` - JSON output format (not stream-json)
+- No `--allowed-tools` flag
+
+Key differences from Claude:
+- OpenCode uses `opencode run` subcommand (not direct execution)
+- OpenCode uses `.opencode` directory for configuration
+- OpenCode models use provider/model format (e.g., "anthropic/claude-sonnet-4")
+- OpenCode uses `--format json` instead of `--output-format stream-json`
+- OpenCode doesn't support tool restrictions
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -418,3 +522,22 @@ log('INFO', 'Executing AI command', {
   args,
 });
 ```
+
+---
+
+## Complete File List (Qwen Integration Example)
+
+Below is the exact list of files modified when adding Qwen CLI support:
+
+```
+src/shared/types/messages.ts                                    # Types
+src/extension/services/cli-provider-config.ts                   # CLI config
+src/extension/commands/open-editor.ts                           # Extension command
+src/webview/src/services/vscode-bridge.ts                       # Webview bridge
+src/webview/src/stores/refinement-store.ts                      # State store
+src/webview/src/components/chat/SettingsDropdown.tsx            # Settings UI
+src/webview/src/components/toolbar/ProviderSelectorDropdown.tsx # Provider dropdown
+docs/cli-provider-integration-guide.md                          # Documentation
+```
+
+Total: **8 files** (7 code + 1 doc)

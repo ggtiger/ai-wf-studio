@@ -118,7 +118,8 @@ const SubAgentFlowDialogContent: React.FC<SubAgentFlowDialogProps> = ({ isOpen, 
     ensureActiveWorkflow,
   } = useWorkflowStore();
 
-  const { selectedProvider, selectedQoderModel } = useRefinementStore();
+  const { selectedProvider, selectedModel, selectedQoderModel, selectedOpenCodeModel } =
+    useRefinementStore();
 
   // Local state for panel display (independent from main canvas)
   const [localSelectedNodeId, setLocalSelectedNodeId] = useState<string | null>(null);
@@ -308,7 +309,10 @@ const SubAgentFlowDialogContent: React.FC<SubAgentFlowDialogProps> = ({ isOpen, 
         30000,
         currentRequestId,
         selectedProvider,
-        selectedQoderModel
+        selectedModel, // ClaudeModel
+        selectedQoderModel, // QoderModel
+        undefined, // qwenModel
+        selectedOpenCodeModel // OpenCodeModel
       );
 
       // Only update if not cancelled
@@ -333,7 +337,7 @@ const SubAgentFlowDialogContent: React.FC<SubAgentFlowDialogProps> = ({ isOpen, 
         generationNameRequestIdRef.current = null;
       }
     }
-  }, [activeSubAgentFlow, nodes, edges, locale, selectedProvider, selectedQoderModel]);
+  }, [activeSubAgentFlow, nodes, edges, locale, selectedProvider, selectedModel, selectedQoderModel, selectedOpenCodeModel]);
 
   // Handle cancel name generation
   const handleCancelNameGeneration = useCallback(() => {

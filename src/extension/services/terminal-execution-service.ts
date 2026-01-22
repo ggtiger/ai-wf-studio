@@ -58,9 +58,19 @@ export function executeSlashCommandInTerminal(
 
   // Execute the AI CLI with the slash command
   // Using double quotes to handle workflow names with spaces
-  // For qoder, use -w flag for working directory
+  // Different CLIs have different syntax:
+  // - claude/trae: claude "/workflow-name" (uses .claude/commands/)
+  // - qoder: qodercli -w "dir" "/workflow-name"
+  // - opencode: Does NOT support slash commands - use message directly
+  // - qwen: Does NOT support slash commands
   if (provider === 'qoder') {
     terminal.sendText(`${executable} -w "${options.workingDirectory}" "/${options.workflowName}"`);
+  } else if (provider === 'opencode' || provider === 'qwen') {
+    // OpenCode and Qwen don't support Claude-style slash commands
+    // Just send the workflow name as a message (user can type the actual content)
+    terminal.sendText(
+      `echo "Note: ${provider} does not support slash commands. Please use Claude Code or export as agent." && ${executable}`
+    );
   } else {
     terminal.sendText(`${executable} "/${options.workflowName}"`);
   }

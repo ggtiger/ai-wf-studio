@@ -527,6 +527,8 @@ export function getAiSettings(): Promise<AiSettingsPayload> {
         defaultProvider: 'claude-code',
         defaultModel: 'sonnet',
         defaultQoderModel: 'auto',
+        defaultQwenModel: '',
+        defaultOpenCodeModel: '',
       });
     }, 5000);
   });

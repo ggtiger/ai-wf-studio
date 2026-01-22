@@ -9,6 +9,7 @@ import type {
   AiCliProvider,
   ClaudeModel,
   CopilotModel,
+  OpenCodeModel,
   QoderModel,
   SkillReference,
 } from '../../shared/types/messages';
@@ -247,6 +248,8 @@ export const DEFAULT_REFINEMENT_TIMEOUT_MS = 90000;
  * @param previousValidationErrors - Validation errors from previous failed attempt (for retry with error context)
  * @param provider - AI CLI provider to use (default: 'claude-code')
  * @param copilotModel - Copilot model to use when provider is 'copilot' (default: 'gpt-4o')
+ * @param qoderModel - Qoder model to use when provider is 'qoder' (default: 'auto')
+ * @param openCodeModel - OpenCode model to use when provider is 'opencode' (optional)
  * @returns Refinement result with success status and refined workflow or error
  */
 export async function refineWorkflow(
@@ -264,7 +267,8 @@ export async function refineWorkflow(
   previousValidationErrors?: ValidationErrorInfo[],
   provider: AiCliProvider = 'claude-code',
   copilotModel: CopilotModel = 'gpt-4o',
-  qoderModel: QoderModel = 'auto'
+  qoderModel: QoderModel = 'auto',
+  openCodeModel: OpenCodeModel = ''
 ): Promise<RefinementResult> {
   const startTime = Date.now();
 
@@ -286,6 +290,7 @@ export async function refineWorkflow(
     provider,
     model,
     qoderModel,
+    openCodeModel,
   });
 
   try {
@@ -386,7 +391,7 @@ export async function refineWorkflow(
     const promptSizeChars = prompt.length;
 
     // Determine which model to use based on provider
-    const effectiveModel = getEffectiveModel(provider, model, qoderModel);
+    const effectiveModel = getEffectiveModel(provider, model, qoderModel, '', openCodeModel);
 
     // Step 4: Execute AI (streaming if onProgress callback provided)
     let cliResult = onProgress

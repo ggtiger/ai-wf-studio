@@ -6,9 +6,12 @@
 
 import type {
   AiCliProvider,
+  ClaudeModel,
   ExtensionMessage,
   GenerateWorkflowNamePayload,
+  OpenCodeModel,
   QoderModel,
+  QwenModel,
 } from '@shared/types/messages';
 import { vscode } from '../main';
 
@@ -34,7 +37,10 @@ export class AIGenerationError extends Error {
  * @param timeoutMs - Optional timeout in milliseconds (default: 30000)
  * @param externalRequestId - Optional external request ID for cancellation support
  * @param provider - AI CLI provider (default: 'claude-code')
+ * @param model - Claude model when provider is 'claude-code' (default: 'haiku')
  * @param qoderModel - Qoder model when provider is 'qoder' (default: 'efficient')
+ * @param qwenModel - Qwen model when provider is 'qwen' (optional)
+ * @param openCodeModel - OpenCode model when provider is 'opencode' (optional)
  * @returns Promise that resolves to the generated name (kebab-case)
  * @throws {AIGenerationError} If generation fails
  */
@@ -44,7 +50,10 @@ export function generateWorkflowName(
   timeoutMs = 30000,
   externalRequestId?: string,
   provider: AiCliProvider = 'claude-code',
-  qoderModel: QoderModel = 'efficient'
+  model: ClaudeModel = 'haiku',
+  qoderModel: QoderModel = 'efficient',
+  qwenModel?: QwenModel,
+  openCodeModel?: OpenCodeModel
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const requestId = externalRequestId || `req-name-${Date.now()}-${Math.random()}`;
@@ -78,7 +87,10 @@ export function generateWorkflowName(
       targetLanguage,
       timeoutMs,
       provider,
+      model,
       qoderModel,
+      qwenModel,
+      openCodeModel,
     };
 
     vscode.postMessage({

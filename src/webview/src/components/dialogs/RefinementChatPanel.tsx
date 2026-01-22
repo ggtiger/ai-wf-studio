@@ -99,6 +99,7 @@ export function RefinementChatPanel({
     selectedModel,
     selectedQoderModel,
     selectedCopilotModel,
+    selectedOpenCodeModel,
     allowedTools,
     selectedProvider,
   } = useRefinementStore();
@@ -175,7 +176,8 @@ export function RefinementChatPanel({
           allowedTools,
           selectedProvider,
           selectedCopilotModel,
-          selectedQoderModel
+          selectedQoderModel,
+          selectedOpenCodeModel
         );
 
         if (result.type === 'success') {
@@ -263,7 +265,8 @@ export function RefinementChatPanel({
           undefined, // previousValidationErrors
           selectedProvider,
           selectedCopilotModel,
-          selectedQoderModel
+          selectedQoderModel,
+          selectedOpenCodeModel
         );
 
         if (result.type === 'success') {
@@ -376,7 +379,8 @@ export function RefinementChatPanel({
           allowedTools,
           selectedProvider,
           selectedCopilotModel,
-          selectedQoderModel
+          selectedQoderModel,
+          selectedOpenCodeModel
         );
 
         if (result.type === 'success') {
@@ -460,7 +464,8 @@ export function RefinementChatPanel({
           previousValidationErrors,
           selectedProvider,
           selectedCopilotModel,
-          selectedQoderModel
+          selectedQoderModel,
+          selectedOpenCodeModel
         );
 
         if (result.type === 'success') {

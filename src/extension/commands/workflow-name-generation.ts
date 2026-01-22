@@ -40,7 +40,13 @@ export async function handleGenerateWorkflowName(
 
   // Get provider and model from payload (default to claude-code/haiku for backward compatibility)
   const provider = payload.provider || 'claude-code';
-  const effectiveModel = getEffectiveModel(provider, 'haiku', payload.qoderModel || 'efficient');
+  const effectiveModel = getEffectiveModel(
+    provider,
+    payload.model || 'haiku',
+    payload.qoderModel || 'efficient',
+    payload.qwenModel || '',
+    payload.openCodeModel || ''
+  );
 
   log('INFO', 'Workflow name generation started', {
     requestId,

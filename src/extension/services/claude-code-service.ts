@@ -69,6 +69,73 @@ async function getNanoSpawn(): Promise<NanoSpawn> {
  */
 const activeProcesses = new Map<string, { subprocess: Subprocess; startTime: number }>();
 
+/**
+ * Parse CLI output and extract text content from JSON Lines format
+ * Handles OpenCode/Qoder format: {"type":"text","part":"content",...}
+ *
+ * @param rawOutput - Raw stdout from CLI
+ * @param provider - CLI provider name for format detection
+ * @returns Extracted text content
+ */
+function parseCliOutput(rawOutput: string, provider: AiCliProvider): string {
+  const trimmed = rawOutput.trim();
+
+  // For claude-code, return as-is (plain text output)
+  if (provider === 'claude-code') {
+    return trimmed;
+  }
+
+  // For JSON Lines providers (opencode, qoder, qwen, trae), parse and extract text
+  const lines = trimmed.split('\n').filter((line) => line.trim());
+  const textParts: string[] = [];
+
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+
+      // Handle OpenCode/Qoder text type: {"type":"text","part":"content"}
+      if (parsed.type === 'text') {
+        let content: string | undefined;
+
+        if (typeof parsed.part === 'string') {
+          content = parsed.part;
+        } else if (parsed.part && typeof parsed.part === 'object') {
+          content = parsed.part.text || parsed.part.content;
+        } else if (typeof parsed.text === 'string') {
+          content = parsed.text;
+        } else if (typeof parsed.content === 'string') {
+          content = parsed.content;
+        }
+
+        if (content) {
+          textParts.push(content);
+        }
+      }
+      // Handle assistant message format (Claude-style in JSON mode)
+      else if (parsed.type === 'assistant' && parsed.message?.content) {
+        for (const contentBlock of parsed.message.content) {
+          if (contentBlock.type === 'text' && contentBlock.text) {
+            textParts.push(contentBlock.text);
+          }
+        }
+      }
+    } catch {
+      // Not JSON - might be plain text output, add it
+      if (line.trim()) {
+        textParts.push(line.trim());
+      }
+    }
+  }
+
+  // If we extracted text parts, join them
+  if (textParts.length > 0) {
+    return textParts.join('\n').trim();
+  }
+
+  // Fallback to raw output if no text parts extracted
+  return trimmed;
+}
+
 export interface ClaudeCodeExecutionResult {
   success: boolean;
   output?: string;
@@ -154,15 +221,19 @@ export async function executeAiCli(
 
     const executionTimeMs = Date.now() - startTime;
 
-    // Success - return stdout
+    // Parse output based on provider format
+    const parsedOutput = parseCliOutput(result.stdout, provider);
+
+    // Success - return parsed output
     log('INFO', `${provider} CLI execution succeeded`, {
       executionTimeMs,
-      outputLength: result.stdout.length,
+      rawOutputLength: result.stdout.length,
+      parsedOutputLength: parsedOutput.length,
     });
 
     return {
       success: true,
-      output: result.stdout.trim(),
+      output: parsedOutput,
       executionTimeMs,
     };
   } catch (error) {
@@ -576,10 +647,24 @@ export async function executeAiCliStreaming(
           log('INFO', 'Streaming JSON line parsed', {
             type: parsed.type,
             hasMessage: !!parsed.message,
+            hasText: !!parsed.text,
+            hasContent: !!parsed.content,
+            keys: Object.keys(parsed),
             contentTypes: parsed.message?.content?.map((c: { type: string }) => c.type),
           });
 
-          // ... (rest of the processing logic)
+          // Handle OpenCode error type (API errors, auth errors, etc.)
+          if (parsed.type === 'error' && parsed.error) {
+            const errorData = parsed.error.data || parsed.error;
+            const errorMessage = errorData.message || parsed.error.name || 'Unknown error';
+            log('ERROR', 'OpenCode CLI returned error', {
+              errorName: parsed.error.name,
+              errorMessage,
+              statusCode: errorData.statusCode,
+            });
+            // Throw error to be caught by outer catch block
+            throw new Error(`OpenCode API error: ${errorMessage}`);
+          }
 
           // Extract session ID from init message (for session continuation)
           if (parsed.type === 'system' && parsed.subtype === 'init' && parsed.session_id) {
@@ -587,6 +672,76 @@ export async function executeAiCliStreaming(
             log('INFO', 'Extracted session ID from CLI init message', {
               sessionId: extractedSessionId,
             });
+          }
+
+          // Handle OpenCode top-level text type (different from Claude's assistant message format)
+          // OpenCode sends: { "type": "text", "part": "content", "timestamp": "...", "sessionID": "..." }
+          if (parsed.type === 'text') {
+            log('INFO', 'OpenCode text type received', {
+              hasPartProp: !!parsed.part,
+              partType: typeof parsed.part,
+              partValue: JSON.stringify(parsed.part)?.substring(0, 200),
+              fullParsed: JSON.stringify(parsed).substring(0, 500),
+            });
+
+            // OpenCode uses 'part' field for text content
+            // The 'part' might be nested object with 'text' inside
+            let textContent: string | undefined;
+            if (typeof parsed.part === 'string') {
+              textContent = parsed.part;
+            } else if (parsed.part && typeof parsed.part === 'object') {
+              // Try to extract text from nested object
+              textContent = parsed.part.text || parsed.part.content || JSON.stringify(parsed.part);
+            }
+
+            if (textContent && typeof textContent === 'string' && textContent.length > 0) {
+              // Add separator between text chunks for better readability
+              if (accumulated.length > 0 && !accumulated.endsWith('\n')) {
+                accumulated += '\n\n';
+              }
+              accumulated += textContent;
+
+              // Check if accumulated text looks like JSON response
+              const trimmedAccumulated = accumulated.trim();
+              let strippedText = trimmedAccumulated;
+
+              // Strip markdown code block markers
+              if (strippedText.startsWith('```json')) {
+                strippedText = strippedText.slice(7).trimStart();
+              } else if (strippedText.startsWith('```')) {
+                strippedText = strippedText.slice(3).trimStart();
+              }
+              if (strippedText.endsWith('```')) {
+                strippedText = strippedText.slice(0, -3).trimEnd();
+              }
+
+              // Try to parse as JSON - if successful, skip progress (let success handler show it)
+              try {
+                const jsonResponse = JSON.parse(strippedText);
+                log('INFO', 'JSON parse succeeded in OpenCode text handler', {
+                  hasStatus: !!jsonResponse.status,
+                  hasMessage: !!jsonResponse.message,
+                  hasValues: !!jsonResponse.values,
+                });
+                // JSON parsed successfully - don't call onProgress for JSON content
+              } catch {
+                // JSON parsing failed - this is explanatory text or incomplete JSON
+                const looksLikeJsonStart =
+                  strippedText.startsWith('{') || trimmedAccumulated.startsWith('```');
+
+                if (!looksLikeJsonStart) {
+                  // This is explanatory text from AI
+                  const jsonBlockIndex = trimmedAccumulated.indexOf('```json');
+                  if (jsonBlockIndex !== -1) {
+                    explanatoryText = trimmedAccumulated.slice(0, jsonBlockIndex).trim();
+                  } else {
+                    explanatoryText = trimmedAccumulated;
+                  }
+                  currentToolInfo = '';
+                  onProgress(textContent, explanatoryText, explanatoryText, 'text');
+                }
+              }
+            }
           }
 
           // Extract content from assistant messages
@@ -813,6 +968,21 @@ export async function executeAiCliStreaming(
           code: 'UNKNOWN_ERROR',
           message: 'Generation failed - please try again or rephrase your description',
           details: `Exit code: ${error.exitCode ?? 'unknown'}, stderr: ${error.stderr ?? 'none'}`,
+        },
+        executionTimeMs,
+        sessionId: extractedSessionId,
+      };
+    }
+
+    // Handle OpenCode API errors (thrown from JSON parsing)
+    if (error instanceof Error && error.message.startsWith('OpenCode API error:')) {
+      return {
+        success: false,
+        output: accumulated,
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: error.message,
+          details: error.message,
         },
         executionTimeMs,
         sessionId: extractedSessionId,

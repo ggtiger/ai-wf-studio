@@ -1,12 +1,18 @@
 /**
  * CLI Provider Configuration Service
  *
- * Manages configuration for different AI CLI providers (Claude Code, Qoder, Trae).
+ * Manages configuration for different AI CLI providers (Claude Code, Qoder, Trae, Qwen, OpenCode).
  * Each provider may have different command-line argument formats.
  */
 
 import * as vscode from 'vscode';
-import type { AiCliProvider, ClaudeModel, QoderModel } from '../../shared/types/messages';
+import type {
+  AiCliProvider,
+  ClaudeModel,
+  OpenCodeModel,
+  QoderModel,
+  QwenModel,
+} from '../../shared/types/messages';
 import { log } from '../extension';
 import { getCliPath } from './claude-cli-path';
 
@@ -78,7 +84,6 @@ const claudeCodeConfig: CliProviderConfig = {
   buildArgs: (options) => {
     const args = ['-p', '-', '--model', options.model];
     if (options.allowedTools && options.allowedTools.length > 0) {
-      args.push('--tools', options.allowedTools.join(','));
       args.push('--allowed-tools', options.allowedTools.join(','));
     }
     return args;
@@ -97,7 +102,6 @@ const claudeCodeConfig: CliProviderConfig = {
       args.push('--resume', options.resumeSessionId);
     }
     if (options.allowedTools && options.allowedTools.length > 0) {
-      args.push('--tools', options.allowedTools.join(','));
       args.push('--allowed-tools', options.allowedTools.join(','));
     }
     return args;
@@ -157,7 +161,6 @@ const traeConfig: CliProviderConfig = {
   buildArgs: (options) => {
     const args = ['-p', '-', '--model', options.model];
     if (options.allowedTools && options.allowedTools.length > 0) {
-      args.push('--tools', options.allowedTools.join(','));
       args.push('--allowed-tools', options.allowedTools.join(','));
     }
     return args;
@@ -176,8 +179,87 @@ const traeConfig: CliProviderConfig = {
       args.push('--resume', options.resumeSessionId);
     }
     if (options.allowedTools && options.allowedTools.length > 0) {
-      args.push('--tools', options.allowedTools.join(','));
       args.push('--allowed-tools', options.allowedTools.join(','));
+    }
+    return args;
+  },
+};
+
+/**
+ * Qwen CLI configuration
+ * Qwen CLI uses similar arguments to Claude Code CLI:
+ * - Uses -p for prompt (deprecated, but still functional)
+ * - Uses -m/--model for model selection
+ * - Uses -o/--output-format with stream-json for streaming
+ * - Uses -r/--resume for session resume
+ * - Uses --allowed-tools for tool restrictions
+ */
+const qwenConfig: CliProviderConfig = {
+  executable: 'qwen',
+  supportsStreaming: true,
+  supportsSessionResume: true,
+  supportsToolRestriction: true,
+  defaultModels: [], // Models are dynamically discovered
+  buildArgs: (options) => {
+    const args: string[] = ['-p', '-'];
+    // Only add model if specified (Qwen uses dynamic models)
+    if (options.model) {
+      args.push('--model', options.model);
+    }
+    if (options.allowedTools && options.allowedTools.length > 0) {
+      args.push('--allowed-tools', options.allowedTools.join(','));
+    }
+    return args;
+  },
+  buildStreamingArgs: (options) => {
+    const args: string[] = ['-p', '-', '--output-format', 'stream-json'];
+    // Only add model if specified
+    if (options.model) {
+      args.push('--model', options.model);
+    }
+    if (options.resumeSessionId) {
+      args.push('--resume', options.resumeSessionId);
+    }
+    if (options.allowedTools && options.allowedTools.length > 0) {
+      args.push('--allowed-tools', options.allowedTools.join(','));
+    }
+    return args;
+  },
+};
+
+/**
+ * OpenCode CLI configuration
+ * OpenCode CLI uses `opencode run` for non-interactive execution:
+ * - Uses --format json for JSON output
+ * - Uses -m for model selection (format: provider/model)
+ * - Uses -s for session resume
+ * - Uses -c for continue last session
+ * - Message is passed via stdin
+ */
+const openCodeConfig: CliProviderConfig = {
+  executable: 'opencode',
+  supportsStreaming: true,
+  supportsSessionResume: true,
+  supportsToolRestriction: false, // OpenCode doesn't have --allowed-tools
+  defaultModels: [], // Models are dynamically discovered
+  buildArgs: (options) => {
+    const args: string[] = ['run'];
+    // Only add model if specified (format: provider/model)
+    if (options.model) {
+      args.push('-m', options.model);
+    }
+    // OpenCode uses --format json for structured output
+    args.push('--format', 'json');
+    return args;
+  },
+  buildStreamingArgs: (options) => {
+    const args: string[] = ['run', '--format', 'json'];
+    // Only add model if specified
+    if (options.model) {
+      args.push('-m', options.model);
+    }
+    if (options.resumeSessionId) {
+      args.push('-s', options.resumeSessionId);
     }
     return args;
   },
@@ -190,6 +272,8 @@ const providerConfigs: Record<Exclude<AiCliProvider, 'copilot'>, CliProviderConf
   'claude-code': claudeCodeConfig,
   qoder: qoderConfig,
   trae: traeConfig,
+  qwen: qwenConfig,
+  opencode: openCodeConfig,
 };
 
 /**
@@ -245,6 +329,14 @@ export async function detectCurrentProvider(): Promise<AiCliProvider> {
         log('INFO', 'Detected Trae from VSCode appName', { appName: vscodeEnv.appName });
         return 'trae';
       }
+      if (productName.includes('qwen')) {
+        log('INFO', 'Detected Qwen from VSCode appName', { appName: vscodeEnv.appName });
+        return 'qwen';
+      }
+      if (productName.includes('opencode')) {
+        log('INFO', 'Detected OpenCode from VSCode appName', { appName: vscodeEnv.appName });
+        return 'opencode';
+      }
       if (productName.includes('cursor')) {
         log('INFO', 'Detected Cursor from VSCode appName', { appName: vscodeEnv.appName });
         return 'claude-code'; // Cursor uses Claude Code CLI
@@ -264,16 +356,33 @@ export async function detectCurrentProvider(): Promise<AiCliProvider> {
     log('INFO', 'Detected Trae from environment');
     return 'trae';
   }
+  if (appName.toLowerCase().includes('qwen')) {
+    log('INFO', 'Detected Qwen from environment');
+    return 'qwen';
+  }
+  if (appName.toLowerCase().includes('opencode')) {
+    log('INFO', 'Detected OpenCode from environment');
+    return 'opencode';
+  }
 
   // Method 3: Check which CLI executables are available
-  const [qoderAvailable, traeAvailable, claudeAvailable] = await Promise.all([
-    isCliProviderAvailable('qoder'),
-    isCliProviderAvailable('trae'),
-    isCliProviderAvailable('claude-code'),
-  ]);
+  const [qoderAvailable, traeAvailable, claudeAvailable, qwenAvailable, openCodeAvailable] =
+    await Promise.all([
+      isCliProviderAvailable('qoder'),
+      isCliProviderAvailable('trae'),
+      isCliProviderAvailable('claude-code'),
+      isCliProviderAvailable('qwen'),
+      isCliProviderAvailable('opencode'),
+    ]);
 
   // If only one CLI is available, use it
-  const availableCount = [qoderAvailable, traeAvailable, claudeAvailable].filter(Boolean).length;
+  const availableCount = [
+    qoderAvailable,
+    traeAvailable,
+    claudeAvailable,
+    qwenAvailable,
+    openCodeAvailable,
+  ].filter(Boolean).length;
   if (availableCount === 1) {
     if (qoderAvailable) {
       log('INFO', 'Auto-detected Qoder (only available CLI)');
@@ -286,6 +395,14 @@ export async function detectCurrentProvider(): Promise<AiCliProvider> {
     if (claudeAvailable) {
       log('INFO', 'Auto-detected Claude Code (only available CLI)');
       return 'claude-code';
+    }
+    if (qwenAvailable) {
+      log('INFO', 'Auto-detected Qwen (only available CLI)');
+      return 'qwen';
+    }
+    if (openCodeAvailable) {
+      log('INFO', 'Auto-detected OpenCode (only available CLI)');
+      return 'opencode';
     }
   }
 
@@ -326,6 +443,12 @@ export function getDefaultProvider(): AiCliProvider {
       if (productName.includes('trae')) {
         return 'trae';
       }
+      if (productName.includes('qwen')) {
+        return 'qwen';
+      }
+      if (productName.includes('opencode')) {
+        return 'opencode';
+      }
     }
   } catch {
     // Ignore
@@ -352,7 +475,7 @@ export async function initializeProviderDetection(): Promise<void> {
   log('INFO', 'Provider detection initialized', { provider: cachedProvider });
 
   // Pre-load models for all available providers
-  const providers: AiCliProvider[] = ['claude-code', 'qoder', 'trae'];
+  const providers: AiCliProvider[] = ['claude-code', 'qoder', 'trae', 'qwen', 'opencode'];
   await Promise.all(
     providers.map(async (provider) => {
       try {
@@ -405,10 +528,44 @@ export function getDefaultQoderModel(): QoderModel {
 }
 
 /**
+ * Get default Qwen model from VSCode settings
+ *
+ * @returns Default Qwen model (empty string means use CLI default)
+ */
+export function getDefaultQwenModel(): QwenModel {
+  const config = vscode.workspace.getConfiguration('cc-wf-studio.ai');
+  const model = config.get<QwenModel>('defaultQwenModel');
+
+  if (model) {
+    log('INFO', 'Using default Qwen model from settings', { model });
+    return model;
+  }
+
+  return ''; // Empty string means use CLI default
+}
+
+/**
+ * Get default OpenCode model from VSCode settings
+ *
+ * @returns Default OpenCode model (empty string means use CLI default)
+ */
+export function getDefaultOpenCodeModel(): OpenCodeModel {
+  const config = vscode.workspace.getConfiguration('cc-wf-studio.ai');
+  const model = config.get<OpenCodeModel>('defaultOpenCodeModel');
+
+  if (model) {
+    log('INFO', 'Using default OpenCode model from settings', { model });
+    return model;
+  }
+
+  return ''; // Empty string means use CLI default
+}
+
+/**
  * Check if provider is valid
  */
 function isValidProvider(provider: string): provider is AiCliProvider {
-  return ['claude-code', 'qoder', 'trae', 'copilot'].includes(provider);
+  return ['claude-code', 'qoder', 'trae', 'copilot', 'qwen', 'opencode'].includes(provider);
 }
 
 /**
@@ -430,21 +587,33 @@ function isValidQoderModel(model: string): model is QoderModel {
  *
  * This is the single source of truth for model selection:
  * - For 'qoder' provider: uses qoderModel
+ * - For 'qwen' provider: uses qwenModel
+ * - For 'opencode' provider: uses openCodeModel
  * - For 'claude-code' or 'trae': uses claudeModel
  * - For 'copilot': returns empty string (handled by vscode-lm-service)
  *
  * @param provider - The AI CLI provider
  * @param claudeModel - Claude/Trae model (default: 'sonnet')
  * @param qoderModel - Qoder model (default: 'auto')
+ * @param qwenModel - Qwen model (optional, uses CLI default if empty)
+ * @param openCodeModel - OpenCode model (optional, format: provider/model)
  * @returns The effective model string to use
  */
 export function getEffectiveModel(
   provider: AiCliProvider,
   claudeModel: ClaudeModel = 'sonnet',
-  qoderModel: QoderModel = 'auto'
+  qoderModel: QoderModel = 'auto',
+  qwenModel: QwenModel = '',
+  openCodeModel: OpenCodeModel = ''
 ): string {
   if (provider === 'qoder') {
     return qoderModel;
+  }
+  if (provider === 'qwen') {
+    return qwenModel; // May be empty, which means use CLI default
+  }
+  if (provider === 'opencode') {
+    return openCodeModel; // May be empty, which means use CLI default
   }
   if (provider === 'copilot') {
     return ''; // Copilot uses vscode-lm-service with its own model handling
@@ -613,6 +782,48 @@ async function tryDetectModelsFromCli(
       }
     }
 
+    // For OpenCode, use 'opencode models' command
+    if (provider === 'opencode') {
+      try {
+        const spawn = await getNanoSpawn();
+        const result = await spawn(cliPath, ['models'], { timeout: 10000 });
+        const output = result.stdout;
+
+        // Parse OpenCode model list - each line is a model ID (e.g., "openrouter/anthropic/claude-sonnet-4")
+        const models: CliModelInfo[] = [];
+        const lines = output.split('\n');
+
+        for (const line of lines) {
+          const modelId = line.trim();
+          if (modelId && !modelId.startsWith('[') && modelId.includes('/')) {
+            // Create readable name from model ID
+            const parts = modelId.split('/');
+            const modelName = parts[parts.length - 1]; // Last part is the model name
+            const providerName = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+            const displayName = `${providerName}/${modelName}`;
+
+            models.push({
+              id: modelId,
+              name: displayName,
+              available: true,
+            });
+          }
+        }
+
+        if (models.length > 0) {
+          log('INFO', `Detected models from OpenCode CLI`, {
+            count: models.length,
+            sample: models.slice(0, 5).map((m) => m.id),
+          });
+          return models;
+        }
+      } catch (error) {
+        log('INFO', `Could not get models from opencode models command`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Generic fallback: try --help to see if it contains model information
     const spawn = await getNanoSpawn();
     const result = await spawn(cliPath, ['--help'], { timeout: 5000 });
@@ -680,6 +891,12 @@ export function getConfigDirectory(provider: AiCliProvider): string {
   if (provider === 'qoder') {
     return '.qoder';
   }
+  if (provider === 'qwen') {
+    return '.qwen';
+  }
+  if (provider === 'opencode') {
+    return '.opencode';
+  }
   // claude-code, trae, copilot all use .vscode
   return '.vscode';
 }
@@ -690,14 +907,22 @@ export function getConfigDirectory(provider: AiCliProvider): string {
  * Different CLIs use different directory names:
  * - Claude Code / Trae: .claude
  * - Qoder: .qoder (lowercase)
+ * - Qwen: .qwen
+ * - OpenCode: .opencode
  * - Copilot: .vscode (uses VS Code)
  *
  * @param provider - The AI CLI provider
- * @returns CLI directory name (e.g., '.claude', '.qoder')
+ * @returns CLI directory name (e.g., '.claude', '.qoder', '.qwen', '.opencode')
  */
 export function getCliDirectory(provider: AiCliProvider): string {
   if (provider === 'qoder') {
     return '.qoder';
+  }
+  if (provider === 'qwen') {
+    return '.qwen';
+  }
+  if (provider === 'opencode') {
+    return '.opencode';
   }
   if (provider === 'claude-code' || provider === 'trae') {
     return '.claude';

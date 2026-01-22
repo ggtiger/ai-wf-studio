@@ -97,7 +97,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     toggleCopilotEnabled,
     selectedProvider,
     setSelectedProvider,
+    selectedModel,
     selectedQoderModel,
+    selectedOpenCodeModel,
   } = useRefinementStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -552,7 +554,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         30000,
         currentRequestId,
         selectedProvider,
-        selectedQoderModel
+        selectedModel, // ClaudeModel
+        selectedQoderModel, // QoderModel
+        undefined, // qwenModel
+        selectedOpenCodeModel // OpenCodeModel
       );
 
       // Only update if not cancelled
@@ -585,7 +590,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     setWorkflowName,
     t,
     selectedProvider,
+    selectedModel,
     selectedQoderModel,
+    selectedOpenCodeModel,
   ]);
 
   // Handle cancel name generation

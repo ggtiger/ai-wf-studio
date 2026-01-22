@@ -14,13 +14,14 @@ import type {
 } from '@shared/types/messages';
 import type { ConversationHistory, ConversationMessage } from '@shared/types/workflow-definition';
 import { create } from 'zustand';
-import { listCopilotModels } from '../services/refinement-service';
+import { listCopilotModels, listOpenCodeModels } from '../services/refinement-service';
 import { getAiSettings } from '../services/vscode-bridge';
 
 // localStorage keys
 const MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedModel';
 const QODER_MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedQoderModel';
 const COPILOT_MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedCopilotModel';
+const OPENCODE_MODEL_STORAGE_KEY = 'cc-wf-studio.refinement.selectedOpenCodeModel';
 const ALLOWED_TOOLS_STORAGE_KEY = 'cc-wf-studio.refinement.allowedTools';
 const PROVIDER_STORAGE_KEY = 'cc-wf-studio.refinement.selectedProvider';
 // Note: This key is shared with Toolbar.tsx for the "Copilot (Beta)" toggle
@@ -167,6 +168,42 @@ function saveCopilotModelToStorage(model: CopilotModel): void {
 }
 
 /**
+ * OpenCode model info type for dynamic model list
+ */
+export interface OpenCodeModelInfo {
+  id: string;
+  name: string;
+  available: boolean;
+}
+
+/**
+ * Load selected OpenCode model from localStorage
+ * Returns empty string as default (will use first available model)
+ */
+function loadOpenCodeModelFromStorage(): string {
+  try {
+    const saved = localStorage.getItem(OPENCODE_MODEL_STORAGE_KEY);
+    if (saved && saved.trim() !== '') {
+      return saved;
+    }
+  } catch {
+    // localStorage may not be available in some contexts
+  }
+  return ''; // Default - will be set to first available model
+}
+
+/**
+ * Save selected OpenCode model to localStorage
+ */
+function saveOpenCodeModelToStorage(model: string): void {
+  try {
+    localStorage.setItem(OPENCODE_MODEL_STORAGE_KEY, model);
+  } catch {
+    // localStorage may not be available in some contexts
+  }
+}
+
+/**
  * Load allowed tools from localStorage
  * Returns DEFAULT_ALLOWED_TOOLS if no value is stored or value is invalid
  */
@@ -203,7 +240,14 @@ function saveAllowedToolsToStorage(tools: string[]): void {
 function loadProviderFromStorage(): AiCliProvider {
   try {
     const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
-    if (saved === 'claude-code' || saved === 'copilot' || saved === 'qoder' || saved === 'trae') {
+    if (
+      saved === 'claude-code' ||
+      saved === 'copilot' ||
+      saved === 'qoder' ||
+      saved === 'trae' ||
+      saved === 'qwen' ||
+      saved === 'opencode'
+    ) {
       return saved;
     }
   } catch {
@@ -285,6 +329,12 @@ interface RefinementStore {
   isFetchingCopilotModels: boolean;
   copilotModelsError: string | null;
 
+  // Dynamic OpenCode Models State
+  selectedOpenCodeModel: string;
+  availableOpenCodeModels: OpenCodeModelInfo[];
+  isFetchingOpenCodeModels: boolean;
+  openCodeModelsError: string | null;
+
   // Session Status
   sessionStatus: SessionStatus;
 
@@ -307,6 +357,8 @@ interface RefinementStore {
   setSelectedProvider: (provider: AiCliProvider) => void;
   toggleCopilotEnabled: () => void;
   fetchCopilotModels: () => Promise<void>;
+  setSelectedOpenCodeModel: (model: string) => void;
+  fetchOpenCodeModels: () => Promise<void>;
   initConversation: () => void;
   loadConversationHistory: (history: ConversationHistory | undefined) => void;
   setTargetContext: (
@@ -406,6 +458,12 @@ export const useRefinementStore = create<RefinementStore>((set, get) => ({
   availableCopilotModels: [],
   isFetchingCopilotModels: false,
   copilotModelsError: null,
+
+  // Dynamic OpenCode Models Initial State
+  selectedOpenCodeModel: loadOpenCodeModelFromStorage(),
+  availableOpenCodeModels: [],
+  isFetchingOpenCodeModels: false,
+  openCodeModelsError: null,
 
   // Session Status Initial State
   sessionStatus: 'none',
@@ -527,6 +585,54 @@ export const useRefinementStore = create<RefinementStore>((set, get) => ({
         isFetchingCopilotModels: false,
         copilotModelsError:
           error instanceof Error ? error.message : 'Failed to fetch Copilot models',
+      });
+    }
+  },
+
+  setSelectedOpenCodeModel: (model: string) => {
+    set({ selectedOpenCodeModel: model });
+    saveOpenCodeModelToStorage(model);
+  },
+
+  fetchOpenCodeModels: async () => {
+    // Avoid fetching if already in progress
+    if (get().isFetchingOpenCodeModels) {
+      return;
+    }
+
+    set({ isFetchingOpenCodeModels: true, openCodeModelsError: null });
+
+    try {
+      const result = await listOpenCodeModels();
+
+      if (result.available) {
+        set({
+          availableOpenCodeModels: result.models,
+          isFetchingOpenCodeModels: false,
+          openCodeModelsError: null,
+        });
+
+        // If current selected model is not in the list, select the first available
+        const currentModel = get().selectedOpenCodeModel;
+        const modelExists = result.models.some((m) => m.id === currentModel);
+        if (!modelExists && result.models.length > 0) {
+          const firstModel = result.models[0].id;
+          set({ selectedOpenCodeModel: firstModel });
+          saveOpenCodeModelToStorage(firstModel);
+        }
+      } else {
+        set({
+          availableOpenCodeModels: [],
+          isFetchingOpenCodeModels: false,
+          openCodeModelsError: result.unavailableReason || 'OpenCode models not available',
+        });
+      }
+    } catch (error) {
+      set({
+        availableOpenCodeModels: [],
+        isFetchingOpenCodeModels: false,
+        openCodeModelsError:
+          error instanceof Error ? error.message : 'Failed to fetch OpenCode models',
       });
     }
   },

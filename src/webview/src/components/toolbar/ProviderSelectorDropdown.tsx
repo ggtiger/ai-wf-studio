@@ -23,6 +23,8 @@ const PROVIDER_OPTIONS: {
   { value: 'claude-code', label: 'Claude Code' },
   { value: 'qoder', label: 'Qoder' },
   { value: 'trae', label: 'Trae' },
+  { value: 'qwen', label: 'Qwen' },
+  { value: 'opencode', label: 'OpenCode' },
 ];
 
 interface ProviderSelectorDropdownProps {

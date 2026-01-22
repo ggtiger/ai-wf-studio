@@ -46,6 +46,8 @@ const PROVIDER_PRESETS: { value: AiCliProvider; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
   { value: 'qoder', label: 'Qoder' },
   { value: 'trae', label: 'Trae' },
+  { value: 'qwen', label: 'Qwen' },
+  { value: 'opencode', label: 'OpenCode' },
 ];
 
 // Fixed font sizes for dropdown menu (not responsive)
@@ -81,6 +83,12 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
     isFetchingCopilotModels,
     copilotModelsError,
     fetchCopilotModels,
+    selectedOpenCodeModel,
+    setSelectedOpenCodeModel,
+    availableOpenCodeModels,
+    isFetchingOpenCodeModels,
+    openCodeModelsError,
+    fetchOpenCodeModels,
     // conversationHistory, // Uncomment when re-enabling Iteration Counter
   } = useRefinementStore();
 
@@ -102,12 +110,34 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
     fetchCopilotModels,
   ]);
 
+  // Fetch OpenCode models when provider is set to opencode and models are not loaded
+  useEffect(() => {
+    if (
+      selectedProvider === 'opencode' &&
+      availableOpenCodeModels.length === 0 &&
+      !isFetchingOpenCodeModels &&
+      !openCodeModelsError
+    ) {
+      fetchOpenCodeModels();
+    }
+  }, [
+    selectedProvider,
+    availableOpenCodeModels.length,
+    isFetchingOpenCodeModels,
+    openCodeModelsError,
+    fetchOpenCodeModels,
+  ]);
+
   const currentModelLabel = MODEL_PRESETS.find((p) => p.value === selectedModel)?.label || 'Sonnet';
   const currentQoderModelLabel =
     QODER_MODEL_PRESETS.find((p) => p.value === selectedQoderModel)?.label || 'Auto';
   const currentCopilotModelLabel =
     availableCopilotModels.find((m) => m.family === selectedCopilotModel)?.name ||
     selectedCopilotModel ||
+    'Loading...';
+  const currentOpenCodeModelLabel =
+    availableOpenCodeModels.find((m) => m.id === selectedOpenCodeModel)?.name ||
+    selectedOpenCodeModel ||
     'Loading...';
   const providerOptions: { value: AiCliProvider; label: string }[] = isCopilotEnabled
     ? [...PROVIDER_PRESETS, { value: 'copilot', label: 'Copilot' }]
@@ -119,6 +149,8 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
   const getModelLabel = () => {
     if (selectedProvider === 'copilot') return currentCopilotModelLabel;
     if (selectedProvider === 'qoder') return currentQoderModelLabel;
+    if (selectedProvider === 'opencode') return currentOpenCodeModelLabel;
+    if (selectedProvider === 'qwen') return 'Default';
     return currentModelLabel;
   };
 
@@ -410,6 +442,92 @@ export function SettingsDropdown({ onClearHistoryClick, hasMessages }: SettingsD
                       </DropdownMenu.RadioItem>
                     ))}
                   </DropdownMenu.RadioGroup>
+                ) : selectedProvider === 'qwen' ? (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: `${FONT_SIZES.small}px`,
+                      color: 'var(--vscode-descriptionForeground)',
+                    }}
+                  >
+                    Using CLI default model
+                  </div>
+                ) : selectedProvider === 'opencode' ? (
+                  isFetchingOpenCodeModels ? (
+                    <div
+                      style={{
+                        padding: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        color: 'var(--vscode-descriptionForeground)',
+                        fontSize: `${FONT_SIZES.small}px`,
+                      }}
+                    >
+                      <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Loading models...</span>
+                    </div>
+                  ) : openCodeModelsError ? (
+                    <div
+                      style={{
+                        padding: '12px',
+                        color: 'var(--vscode-errorForeground)',
+                        fontSize: `${FONT_SIZES.small}px`,
+                      }}
+                    >
+                      {openCodeModelsError}
+                    </div>
+                  ) : availableOpenCodeModels.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '12px',
+                        color: 'var(--vscode-descriptionForeground)',
+                        fontSize: `${FONT_SIZES.small}px`,
+                      }}
+                    >
+                      No models available
+                    </div>
+                  ) : (
+                    <DropdownMenu.RadioGroup value={selectedOpenCodeModel}>
+                      {availableOpenCodeModels.map((model) => (
+                        <DropdownMenu.RadioItem
+                          key={model.id}
+                          value={model.id}
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            setSelectedOpenCodeModel(model.id);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: `${FONT_SIZES.small}px`,
+                            color: 'var(--vscode-foreground)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            outline: 'none',
+                            borderRadius: '2px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <DropdownMenu.ItemIndicator>
+                              <Check size={12} />
+                            </DropdownMenu.ItemIndicator>
+                          </div>
+                          <span>{model.name}</span>
+                        </DropdownMenu.RadioItem>
+                      ))}
+                    </DropdownMenu.RadioGroup>
+                  )
                 ) : selectedProvider !== 'copilot' ? (
                   <DropdownMenu.RadioGroup value={selectedModel}>
                     {MODEL_PRESETS.map((preset) => (
